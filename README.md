@@ -10,7 +10,7 @@ Consulte [como gerar e distribuir o instalador](packaging/README.md). O `.exe` p
 
 ## APK Android sem hospedagem
 
-A edição Android instala diretamente pelo arquivo **[DoceAtelie-Android-1.0.0.apk](android/distribuicao/DoceAtelie-Android-1.0.0.apk)** e funciona sem internet, com banco e fotos no celular. Inclui gestão de clientes, catálogo, orçamentos, pagamentos, agenda, PDFs e backup. O banco é independente do Windows. Consulte [instalação e recursos do APK](android/README.md).
+A edição Android instala diretamente pelo arquivo **[DoceAtelie-Android-1.0.1.apk](android/distribuicao/DoceAtelie-Android-1.0.1.apk)** e funciona sem internet, com banco e fotos no celular. Inclui gestão de clientes, catálogo, orçamentos, pagamentos, agenda, PDFs e backup. O banco é independente do Windows. Consulte [instalação e recursos do APK](android/README.md).
 
 ## Atualização 1.2 · Windows, Android e iOS
 

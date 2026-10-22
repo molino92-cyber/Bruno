@@ -58,4 +58,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: DoceAtelie-Android-APK
-          path: android/distribuicao/DoceAtelie-Android-1.0.0.apk
+          path: android/distribuicao/DoceAtelie-Android-1.0.1.apk

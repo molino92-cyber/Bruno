@@ -5,12 +5,16 @@ import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
 import android.util.Base64;
 import android.view.View;
 import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.widget.FrameLayout;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -43,12 +47,35 @@ public class MainActivity extends Activity {
         store=new LocalStore(this);
         getWindow().setStatusBarColor(Color.rgb(24,42,53));
         getWindow().setNavigationBarColor(Color.rgb(255,255,255));
+        if(Build.VERSION.SDK_INT>=29)getWindow().setNavigationBarContrastEnforced(false);
+        if(Build.VERSION.SDK_INT>=30)getWindow().setDecorFitsSystemWindows(false);
+        else getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        FrameLayout safeArea=new FrameLayout(this){
+            private final Paint statusPaint=new Paint();
+            @Override protected void onDraw(Canvas canvas){
+                super.onDraw(canvas);
+                statusPaint.setColor(Color.rgb(24,42,53));
+                canvas.drawRect(0,0,getWidth(),getPaddingTop(),statusPaint);
+            }
+        };
+        safeArea.setBackgroundColor(Color.WHITE);
+        safeArea.setWillNotDraw(false);
         web=new WebView(this);
-        setContentView(web);
-        if (Build.VERSION.SDK_INT>=35) web.setOnApplyWindowInsetsListener((view,insets)->{
-            android.graphics.Insets padding=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout()|WindowInsets.Type.ime());
-            view.setPadding(padding.left,padding.top,padding.right,padding.bottom);
-            return insets;
+        safeArea.addView(web,new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,FrameLayout.LayoutParams.MATCH_PARENT));
+        safeArea.setOnApplyWindowInsetsListener((view,insets)->{
+            if(Build.VERSION.SDK_INT>=30){
+                android.graphics.Insets padding=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout()|WindowInsets.Type.ime());
+                view.setPadding(padding.left,padding.top,padding.right,padding.bottom);
+                return WindowInsets.CONSUMED;
+            }
+            view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
+            return insets.consumeSystemWindowInsets();
+        });
+        setContentView(safeArea);
+        safeArea.requestApplyInsets();
+        if(Build.VERSION.SDK_INT>=30)safeArea.post(()->{
+            WindowInsetsController controller=getWindow().getInsetsController();
+            if(controller!=null)controller.setSystemBarsAppearance(WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS|WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
         });
         WebSettings settings=web.getSettings();
         settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);

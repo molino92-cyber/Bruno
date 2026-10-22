@@ -4,7 +4,7 @@ O aplicativo Android **instala por APK e funciona sozinho no celular**, sem Pyth
 
 ## Instalar
 
-1. No Android, baixe [`DoceAtelie-Android-1.0.0.apk`](distribuicao/DoceAtelie-Android-1.0.0.apk).
+1. No Android, baixe [`DoceAtelie-Android-1.0.1.apk`](distribuicao/DoceAtelie-Android-1.0.1.apk).
 2. Abra o arquivo baixado. Se o Android solicitar, permita que o navegador ou gerenciador de arquivos usado instale este aplicativo. Não é necessário desativar o Play Protect.
 3. Toque em **Instalar** e abra **Doce Ateliê** pelo ícone.
 4. Em **Mais → Configurações e backup**, cadastre a identidade e a logo da loja. Confira os preços do catálogo: R$ 75/kg para o Simples e R$ 85/kg para o Especial; os demais preços reais ficam para cadastrar.
@@ -12,6 +12,10 @@ O aplicativo Android **instala por APK e funciona sozinho no celular**, sem Pyth
 Para atualizar, instale um APK mais recente da mesma assinatura sobre o aplicativo existente. Faça backup antes. **Não desinstale para atualizar**, pois isso apaga os dados locais. A assinatura e o identificador `br.com.doceatelie` devem ser preservados.
 
 O APK é para Android. iPhone não instala arquivos APK.
+
+## Atualização 1.0.1
+
+Correção da área segura da tela: cabeçalho abaixo da barra de status e menu acima da navegação Android, tanto por gestos quanto por três botões. O teclado reduz a área do aplicativo sem somar os espaços duas vezes. Ícones vetoriais e textos do menu têm contraste maior. A assinatura e o banco são mantidos; instale por cima da versão 1.0.0.
 
 ## Recursos
 
