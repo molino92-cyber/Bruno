@@ -11,3 +11,7 @@ build/
 dist/
 .env
 deploy/.env
+android/.gradle/
+android/local.properties
+android/assinatura/
+android/**/build/

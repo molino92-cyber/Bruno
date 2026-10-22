@@ -8,6 +8,10 @@ O projeto inclui um inicializador com janela própria, empacotamento PyInstaller
 
 Consulte [como gerar e distribuir o instalador](packaging/README.md). O `.exe` precisa ser compilado e validado no Windows; há um workflow manual no GitHub Actions preparado para isso.
 
+## APK Android sem hospedagem
+
+A edição Android instala diretamente pelo arquivo **[DoceAtelie-Android-1.0.0.apk](android/distribuicao/DoceAtelie-Android-1.0.0.apk)** e funciona sem internet, com banco e fotos no celular. Inclui gestão de clientes, catálogo, orçamentos, pagamentos, agenda, PDFs e backup. O banco é independente do Windows. Consulte [instalação e recursos do APK](android/README.md).
+
 ## Atualização 1.2 · Windows, Android e iOS
 
 A versão Windows preserva o funcionamento local. A nova versão para celular é um **PWA com login por senha**, instalável pela URL HTTPS no Android e no iPhone. Para compartilhar pedidos entre aparelhos, hospede o sistema e use a mesma URL. O banco do instalador local não é sincronizado automaticamente com o servidor. Veja [instalação no celular e hospedagem](deploy/README.md).
