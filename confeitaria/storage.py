@@ -1,5 +1,5 @@
 """Persistência SQLite, mídia normalizada e backup consistente."""
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
@@ -267,7 +267,7 @@ class Store:
         with tempfile.TemporaryDirectory() as temp:
             target = Path(temp) / "confeitaria.sqlite3"
             with self.db() as source:
-                with sqlite3.connect(target) as dest:
+                with closing(sqlite3.connect(target)) as dest:
                     source.backup(dest)
             with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
                 archive.write(target, "dados/confeitaria.sqlite3")
