@@ -1,3 +1,4 @@
+from contextlib import closing
 from datetime import date, datetime, timedelta
 from io import BytesIO
 import json
@@ -162,7 +163,7 @@ class ConfeitariaTests(unittest.TestCase):
         self.assertIn("midia/" + filename, archive.namelist())
         dest = self.root / "restored.sqlite3"
         dest.write_bytes(archive.read("dados/confeitaria.sqlite3"))
-        with sqlite3.connect(dest) as db:
+        with closing(sqlite3.connect(dest)) as db:
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
             self.assertEqual(db.execute("SELECT count(*) FROM quotes").fetchone()[0], 1)
 
