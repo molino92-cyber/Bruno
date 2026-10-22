@@ -5,7 +5,7 @@ if ($env:OS -ne "Windows_NT") { throw "O executável Windows precisa ser gerado 
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
 if (-not (Test-Path ".venv-build\Scripts\python.exe")) {
-    py -3.12 -m venv .venv-build
+    python -m venv .venv-build
     if ($LASTEXITCODE -ne 0) { throw "Instale Python 3.12 x64 no computador de compilação." }
 }
 $Python = Join-Path (Get-Location) ".venv-build\Scripts\python.exe"

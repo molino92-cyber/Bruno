@@ -25,7 +25,22 @@ jobs:
           }
       - name: Testar e gerar executável e instalador
         shell: pwsh
-        run: ./packaging/build-windows.ps1
+        run: |
+          try {
+            & ./packaging/build-windows.ps1 *>&1 | Tee-Object -FilePath build-windows.log
+          } catch {
+            $detail = if (Test-Path build-windows.log) { (Get-Content build-windows.log -Tail 55) -join "`n" } else { $_.ToString() }
+            $encoded = $detail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=Detalhes da compilação::$encoded"
+            throw
+          }
+      - name: Guardar log da compilação
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DoceAtelie-Log-Compilacao
+          path: build-windows.log
+          if-no-files-found: ignore
       - name: Disponibilizar instalador
         uses: actions/upload-artifact@v4
         with:
