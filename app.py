@@ -405,7 +405,7 @@ def settings_page():
         remove_logo = st.checkbox("Remover logo atual")
         if st.form_submit_button("Salvar configurações", type="primary"):
             try:
-                logo_name = store.save_image(logo) if logo else "" if remove_logo else settings["logo"]
+                logo_name = "" if remove_logo else store.save_image(logo) if logo else settings["logo"]
                 store.save_settings({"name": name.strip(), "phone": phone.strip(), "document": document.strip(), "address": address.strip(), "change_days": int(days), "logo": logo_name})
                 flash("Nome e logo atualizados no sistema. Serão usados também nos próximos orçamentos salvos.")
             except ValueError as exc:
