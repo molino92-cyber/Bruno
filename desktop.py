@@ -121,8 +121,8 @@ def serve(port, stop_file):
         "server.address": "127.0.0.1", "server.port": port, "server.headless": True,
         "server.baseUrlPath": "doce-atelie", "server.fileWatcherType": "none", "server.runOnSave": False,
         "server.maxUploadSize": 10, "browser.gatherUsageStats": False, "global.developmentMode": False,
-        "theme.primaryColor": "#974e65", "theme.backgroundColor": "#fcfaf7",
-        "theme.secondaryBackgroundColor": "#f4ece8", "theme.textColor": "#342c30",
+        "theme.primaryColor": "#d86b52", "theme.backgroundColor": "#f5f6f8",
+        "theme.secondaryBackgroundColor": "#eef1f4", "theme.textColor": "#243346", "client.toolbarMode": "minimal",
     })
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())

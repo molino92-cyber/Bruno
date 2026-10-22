@@ -1,4 +1,4 @@
-param([string]$Version = "1.0.0")
+param([string]$Version = "1.1.0")
 $ErrorActionPreference = "Stop"
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "Use uma versão no formato 1.0.0." }
 if ($env:OS -ne "Windows_NT") { throw "O executável Windows precisa ser gerado no Windows." }

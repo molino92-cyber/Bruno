@@ -53,7 +53,7 @@ def generate_pdf(quote, store, kitchen=False):
               p(f"{'FICHA DE PRODUÇÃO' if kitchen else 'ORÇAMENTO'} #{quote['id']:04d}", "Heading2"),
               p(f"Cliente: {customer['name']} | WhatsApp: {customer['phone']}"),
               p(f"Saída / retirada: {formatted_date(quote['event_at'])} | {quote['fulfillment']}"),
-              p(f"Endereço de entrega: {quote.get('delivery_address') or customer.get('address') or 'Retirada na loja'}")]
+              p(f"Endereço: {(quote.get('delivery_address') or customer.get('address') or 'Não informado') if quote['fulfillment'] == 'Entrega' else 'Retirada na loja'}")]
     if not kitchen:
         story += [p(f"CPF: {customer.get('cpf') or 'Não informado'}"),
                   p(f"Emitido em: {formatted_date(quote['created_at'])} | Válido até: {datetime.fromisoformat(quote['valid_until']).strftime('%d/%m/%Y')}"),

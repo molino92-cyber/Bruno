@@ -14,7 +14,7 @@ import zipfile
 
 from PIL import Image, ImageOps
 
-from .domain import CATEGORIES, decimal, order_status, totals, validate_cpf
+from .domain import CATEGORIES, CUSTOMER_DEFAULTS, decimal, normalize_customer, order_status, totals
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_SETTINGS = {"name": "Minha Confeitaria", "phone": "", "address": "", "document": "",
@@ -53,7 +53,11 @@ class Store:
                     active INTEGER NOT NULL DEFAULT 1);
                 CREATE TABLE IF NOT EXISTS customers (
                     id INTEGER PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL,
-                    cpf TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', photo TEXT NOT NULL DEFAULT '');
+                    cpf TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', photo TEXT NOT NULL DEFAULT '',
+                    email TEXT NOT NULL DEFAULT '', phone_secondary TEXT NOT NULL DEFAULT '',
+                    postal_code TEXT NOT NULL DEFAULT '', street TEXT NOT NULL DEFAULT '', number TEXT NOT NULL DEFAULT '',
+                    complement TEXT NOT NULL DEFAULT '', neighborhood TEXT NOT NULL DEFAULT '', city TEXT NOT NULL DEFAULT '',
+                    state TEXT NOT NULL DEFAULT '', address_reference TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1);
                 CREATE TABLE IF NOT EXISTS inventory (
                     id INTEGER PRIMARY KEY, name TEXT NOT NULL, brand TEXT NOT NULL DEFAULT '',
                     content TEXT NOT NULL, content_unit TEXT NOT NULL, stock TEXT NOT NULL,
@@ -70,6 +74,19 @@ class Store:
                 CREATE INDEX IF NOT EXISTS quotes_event ON quotes(event_at);
                 CREATE INDEX IF NOT EXISTS payments_quote ON payments(quote_id);
             """)
+            columns = {row[1] for row in db.execute("PRAGMA table_info(customers)")}
+            missing = set(CUSTOMER_DEFAULTS) - columns
+            if missing:
+                backup_dir = self.data_dir / "copias_antes_atualizacao"
+                backup_dir.mkdir(exist_ok=True)
+                target = backup_dir / f"antes-v2-{datetime.now():%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}.sqlite3"
+                with closing(sqlite3.connect(target)) as dest:
+                    db.backup(dest)
+                db.execute("BEGIN IMMEDIATE")
+                columns = {row[1] for row in db.execute("PRAGMA table_info(customers)")}
+                for field in sorted(set(CUSTOMER_DEFAULTS) - columns):
+                    definition = "INTEGER NOT NULL DEFAULT 1" if field == "active" else "TEXT NOT NULL DEFAULT ''"
+                    db.execute(f"ALTER TABLE customers ADD COLUMN {field} {definition}")
             if not db.execute("SELECT 1 FROM settings WHERE key='initialized'").fetchone():
                 seeds = [("Bolo Simples", CATEGORIES[0], "Bolo por quilo com recheios simples. Mínimo de 2 kg.", "kg", 7500),
                          ("Bolo Especial", CATEGORIES[1], "Bolo por quilo com recheios especiais.", "kg", 8500)]
@@ -109,13 +126,31 @@ class Store:
         return self._save("products", values, product_id)
 
     def save_customer(self, values, customer_id=None):
-        values = dict(values)
-        if not values["name"].strip():
-            raise ValueError("Informe o nome do cliente.")
-        if not 10 <= len("".join(c for c in values["phone"] if c.isdigit())) <= 13:
-            raise ValueError("Informe o telefone com DDD (10 a 13 dígitos).")
-        values["cpf"] = validate_cpf(values["cpf"])
-        return self._save("customers", values, customer_id)
+        previous = self.get_customer(customer_id) if customer_id else {}
+        if customer_id and not previous:
+            raise ValueError("Cliente não encontrado.")
+        return self._save("customers", normalize_customer({**(previous or {}), **values}), customer_id)
+
+    def get_customer(self, customer_id):
+        with self.db() as db:
+            row = db.execute("SELECT * FROM customers WHERE id=?", (customer_id,)).fetchone()
+        return dict(row) if row else None
+
+    def delete_customer(self, customer_id):
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if not db.execute("SELECT 1 FROM customers WHERE id=?", (customer_id,)).fetchone():
+                raise ValueError("Cliente não encontrado.")
+            if db.execute("SELECT 1 FROM quotes WHERE customer_id=?", (customer_id,)).fetchone():
+                db.execute("UPDATE customers SET active=0 WHERE id=?", (customer_id,))
+                return "archived"
+            db.execute("DELETE FROM customers WHERE id=?", (customer_id,))
+            return "deleted"
+
+    def restore_customer(self, customer_id):
+        with self.db() as db:
+            if db.execute("UPDATE customers SET active=1 WHERE id=?", (customer_id,)).rowcount != 1:
+                raise ValueError("Cliente não encontrado.")
 
     def save_inventory(self, values, item_id=None):
         if not values["name"].strip() or decimal(values["content"]) <= 0 or decimal(values["stock"]) < 0 or values["paid_cents"] < 0:
@@ -125,7 +160,7 @@ class Store:
     def _save(self, table, values, item_id):
         fields = {
             "products": {"name", "category", "description", "unit", "price_cents", "promo_enabled", "promo_cents", "promo_start", "promo_end", "photos", "active"},
-            "customers": {"name", "phone", "cpf", "address", "photo"},
+            "customers": set(CUSTOMER_DEFAULTS),
             "inventory": {"name", "brand", "content", "content_unit", "stock", "package_unit", "paid_cents", "photo"},
         }
         if table not in fields or set(values) != fields[table]:
@@ -162,7 +197,7 @@ class Store:
         with self.db() as db:
             db.execute("BEGIN IMMEDIATE")
             customer = db.execute("SELECT * FROM customers WHERE id=?", (payload["customer_id"],)).fetchone()
-            if not customer:
+            if not customer or not customer["active"]:
                 raise ValueError("Selecione um cliente cadastrado.")
             payload["customer"] = dict(customer)
             payload["shop"] = self.settings()

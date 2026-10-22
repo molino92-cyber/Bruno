@@ -10,7 +10,7 @@ datas += [(str(root / "app.py"), "."), (str(root / "assets"), "assets")]
 a = Analysis(
     [str(root / "desktop.py")], pathex=[str(root)],
     binaries=st_bins, datas=datas,
-    hiddenimports=st_hidden + ["confeitaria.domain", "confeitaria.storage", "confeitaria.pdf", "PIL.Image", "reportlab.platypus", "pandas", "altair", "pyarrow"],
+    hiddenimports=st_hidden + ["confeitaria.domain", "confeitaria.storage", "confeitaria.pdf", "confeitaria.presentation", "confeitaria.ui_customers", "confeitaria.ui_quotes", "PIL.Image", "reportlab.platypus", "pandas", "altair", "pyarrow"],
     hookspath=[], hooksconfig={}, runtime_hooks=[], excludes=["pytest", "pypdf"],
     noarchive=False,
 )

@@ -1,6 +1,7 @@
 """Regras monetárias independentes da interface e do banco."""
 from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import re
 
 CATEGORIES = ["Bolos Simples", "Bolos Especiais", "Cento de Brigadeiros", "Kits Festa", "Cupcakes", "Mini Donuts", "Topos de Bolo"]
 SIMPLE_FILLINGS = ["Chocolate", "Ninho", "Chocolate Branco", "Dois Amores"]
@@ -9,6 +10,47 @@ EXTRAS = ["Massa de Chocolate", "Brigadeiros no Topo", "Frutas Extras", "Recheio
 BRIGADEIRO_TYPES = ["Tradicional", "Especial", "Personalizado"]
 UNITS = ["Cx", "Un", "Kg", "Grama", "Litro"]
 PAYMENT_METHODS = ["PIX", "Dinheiro", "Cartão"]
+STATES = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
+CUSTOMER_DEFAULTS = {"name": "", "phone": "", "phone_secondary": "", "email": "", "cpf": "", "address": "", "photo": "",
+                     "postal_code": "", "street": "", "number": "", "complement": "", "neighborhood": "", "city": "", "state": "", "address_reference": "", "notes": "", "active": 1}
+
+
+def customer_address(customer):
+    if not customer.get("street"):
+        return customer.get("address", "")
+    street = customer["street"] + (f", {customer['number']}" if customer.get("number") else "")
+    city = " / ".join(filter(None, [customer.get("city"), customer.get("state")]))
+    cep = customer.get("postal_code", "")
+    if len(cep) == 8:
+        cep = cep[:5] + "-" + cep[5:]
+    return " · ".join(filter(None, [street, customer.get("complement"), customer.get("neighborhood"), city, f"CEP {cep}" if cep else ""]))
+
+
+def normalize_customer(values):
+    result = {**CUSTOMER_DEFAULTS, **values}
+    result = {k: str(result[k]).strip() if k != "active" else int(bool(result[k])) for k in CUSTOMER_DEFAULTS}
+    if len(result["name"]) < 2:
+        raise ValueError("Informe o nome do cliente com pelo menos dois caracteres.")
+    for field in ("phone", "phone_secondary"):
+        raw = result[field]
+        digits = re.sub(r"\D", "", raw)
+        if field == "phone" or raw:
+            if not 10 <= len(digits) <= 13 or re.search(r"[^\d\s()+.\-]", raw):
+                raise ValueError("Informe um telefone válido com DDD (10 a 13 dígitos).")
+        result[field] = digits
+    if result["email"] and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", result["email"]):
+        raise ValueError("Informe um e-mail válido, como nome@exemplo.com.")
+    result["email"] = result["email"].lower()
+    if result["postal_code"]:
+        if not re.fullmatch(r"\d{5}-?\d{3}", result["postal_code"]):
+            raise ValueError("Informe o CEP com 8 dígitos, por exemplo 69000-000.")
+        result["postal_code"] = result["postal_code"].replace("-", "")
+    result["state"] = result["state"].upper()
+    if result["state"] and result["state"] not in STATES:
+        raise ValueError("Selecione um estado válido.")
+    result["cpf"] = validate_cpf(result["cpf"])
+    result["address"] = customer_address(result)
+    return result
 
 
 def decimal(value):

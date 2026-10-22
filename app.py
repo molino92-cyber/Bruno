@@ -1,5 +1,6 @@
 """Aplicativo local: execute com `streamlit run app.py`."""
 import calendar
+from copy import deepcopy
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from html import escape
@@ -10,24 +11,12 @@ from confeitaria.domain import (BRIGADEIRO_TYPES, CATEGORIES, EXTRAS, PAYMENT_ME
                                 SPECIAL_FILLINGS, UNITS, active_price, brl, cents, make_line, quantity_text, totals)
 from confeitaria.pdf import formatted_date, generate_pdf
 from confeitaria.storage import Store, inventory_cost
+from confeitaria.presentation import apply_theme, date_field, heading, table
+from confeitaria.ui_customers import change_customer_view, customers_page
+from confeitaria.ui_quotes import quote_editor_page
 
 st.set_page_config(page_title="Doce Ateliê · Gestão", page_icon="🧁", layout="wide")
-st.markdown("""<style>
-:root {--primary-color:#974e65;}
-.stApp {background:#fcfaf7;}
-[data-testid="stSidebar"] {background:#f4ece8;}
-[data-testid="stMetric"] {background:white;border:1px solid #eadfd9;border-radius:14px;padding:18px;}
-h1,h2,h3 {color:#603c49;}
-.eyebrow {font-size:.78rem;letter-spacing:.2em;color:#976778;font-weight:600;margin-bottom:8px;}
-.hero {padding:8px 0 18px;border-bottom:1px solid #e7dbd5;margin-bottom:24px;}
-.hero h1 {font-family:Georgia,serif;font-size:2.7rem;margin:0;}
-.hero p {color:#7d6e70;margin:8px 0;}
-.tag {display:inline-block;background:#f8e5eb;color:#87445b;padding:3px 10px;border-radius:20px;font-size:.8rem;}
-.placeholder {height:145px;background:linear-gradient(135deg,#f3e4df,#f9f1e7);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:3rem;margin-bottom:12px;}
-.stButton>button {border-radius:9px;}
-div[data-testid="stVerticalBlockBorderWrapper"] {border-radius:14px;}
-@media print {[data-testid="stSidebar"] {display:none;}}
-</style>""", unsafe_allow_html=True)
+apply_theme()
 
 
 @st.cache_resource
@@ -39,8 +28,7 @@ store = get_store()
 
 
 def hero(label, title, subtitle):
-    st.markdown(f'<div class="hero"><div class="eyebrow">{escape(label)}</div><h1>{escape(title)}</h1><p>{escape(subtitle)}</p></div>', unsafe_allow_html=True)
-
+    heading(label, title, subtitle)
 
 def image(name, width=None):
     path = store.image_path(name)
@@ -64,7 +52,7 @@ def go(page):
 
 
 def fresh_draft(quote=None):
-    st.session_state["draft"] = dict(quote or {"lines": []})
+    st.session_state["draft"] = deepcopy(quote or {"lines": []})
     st.session_state["draft_version"] = st.session_state.get("draft_version", 0) + 1
     st.session_state["page"] = "Novo orçamento"
 
@@ -75,7 +63,7 @@ def quote_rows(quotes):
 
 
 def dashboard():
-    hero("SEU NEGÓCIO, COM CARINHO", "Uma cozinha organizada.", "Pedidos, produção e números para cuidar de cada detalhe.")
+    hero("PAINEL DA CONFEITARIA", "Sua confeitaria em dia", "Acompanhe as encomendas, a produção e os recebimentos de um só lugar.")
     quotes = store.quotes()
     approved = [q for q in quotes if "Data Reservada" in q["status"]]
     today = [q for q in approved if q["event_at"][:10] == date.today().isoformat()]
@@ -90,7 +78,7 @@ def dashboard():
         st.subheader("Próximas encomendas")
         upcoming = [q for q in approved if q["event_at"][:10] >= date.today().isoformat()][:8]
         if upcoming:
-            st.dataframe(quote_rows(upcoming), hide_index=True, width="stretch")
+            table(quote_rows(upcoming))
         else:
             st.info("As encomendas aparecem aqui quando o sinal de pelo menos 50% é recebido.")
         st.button("Criar orçamento", type="primary", on_click=fresh_draft)
@@ -109,7 +97,7 @@ def dashboard():
 
 
 def catalog():
-    hero("CATÁLOGO & VITRINE", "Feitos para encantar.", "Fotos locais, descrições e promoções com início e fim definidos.")
+    hero("PRODUTOS", "Catálogo da confeitaria", "Seus sabores, suas criações e as ofertas da vez.")
     products = store.list("products")
     showcase, editor = st.tabs(["Vitrine visual", "Cadastrar / editar"])
     with showcase:
@@ -155,13 +143,17 @@ def catalog():
             enabled = st.checkbox("Ativar promoção no intervalo abaixo", value=bool(p.get("promo_enabled", 0)))
             promo = money("Preço promocional (R$)", p.get("promo_cents", 0), key=f"promo_{selected}")
             a, b = st.columns(2)
-            start = a.date_input("Início da promoção", date.fromisoformat(p["promo_start"]) if p.get("promo_start") else date.today())
-            end = b.date_input("Fim da promoção", date.fromisoformat(p["promo_end"]) if p.get("promo_end") else date.today())
+            with a:
+                start = date_field("Início da promoção", date.fromisoformat(p["promo_start"]) if p.get("promo_start") else date.today(), f"promo_start_{selected}", picker=False)
+            with b:
+                end = date_field("Fim da promoção", date.fromisoformat(p["promo_end"]) if p.get("promo_end") else date.today(), f"promo_end_{selected}", picker=False)
             old_photos = p.get("photos", [])
-            kept = st.multiselect("Fotos atuais a manter", old_photos, default=old_photos, format_func=lambda x: f"Foto {old_photos.index(x) + 1}")
+            kept = st.multiselect("Fotos atuais a manter", old_photos, default=old_photos, placeholder="Selecione as fotos", format_func=lambda x: f"Foto {old_photos.index(x) + 1}")
             uploads = st.file_uploader("Adicionar fotos · até 3 no total · 10 MB cada", ["jpg", "jpeg", "png", "webp"], accept_multiple_files=True)
             if st.form_submit_button("Salvar produto", type="primary"):
                 try:
+                    if start is None or end is None:
+                        raise ValueError("Informe as datas no formato DD/MM/AAAA.")
                     if len(kept) + len(uploads) > 3:
                         raise ValueError("Mantenha no máximo três fotos no total.")
                     photos = kept + [store.save_image(upload) for upload in uploads]
@@ -174,7 +166,7 @@ def catalog():
 
 
 def inventory():
-    hero("INSUMOS & MATERIAIS", "Tudo no seu lugar.", "Estoque visual e custo por conteúdo. As movimentações são manuais; não há baixa automática por receita.")
+    hero("PRODUÇÃO", "Estoque e insumos", "Controle embalagens, ingredientes e custos com uma visão do que está disponível.")
     items = store.list("inventory")
     stock_tab, edit_tab = st.tabs(["Estoque visual", "Cadastrar / atualizar"])
     with stock_tab:
@@ -222,183 +214,14 @@ def inventory():
 
 
 def customers():
-    hero("CLIENTES", "Cada pedido tem uma história.", "Contatos, endereços e histórico de encomendas em um só lugar.")
-    clients = store.list("customers")
-    selected = st.selectbox("Cliente", [None] + [c["id"] for c in clients], format_func=lambda x: "＋ Novo cliente" if x is None else next(f"{c['name']} · {c['phone']}" for c in clients if c["id"] == x))
-    client = next((c for c in clients if c["id"] == selected), {})
-    left, right = st.columns([2, 1])
-    with left:
-        with st.form(f"customer_{selected}"):
-            name = st.text_input("Nome completo *", client.get("name", ""))
-            a, b = st.columns(2)
-            phone = a.text_input("Telefone / WhatsApp com DDD *", client.get("phone", ""))
-            cpf = b.text_input("CPF (opcional)", client.get("cpf", ""))
-            address = st.text_area("Endereço de entrega", client.get("address", ""))
-            upload = st.file_uploader("Foto do cliente", ["jpg", "jpeg", "png", "webp"])
-            remove = st.checkbox("Remover foto atual", key=f"remove_customer_{selected}")
-            if st.form_submit_button("Salvar cliente", type="primary"):
-                try:
-                    photo = store.save_image(upload) if upload else "" if remove else client.get("photo", "")
-                    store.save_customer({"name": name.strip(), "phone": phone.strip(), "cpf": cpf, "address": address.strip(), "photo": photo}, selected)
-                    flash("Cliente salvo.")
-                except ValueError as exc:
-                    st.error(str(exc))
-    with right:
-        if client.get("photo"):
-            image(client["photo"])
-        st.caption("Os dados são armazenados apenas no banco local. O backup contém dados pessoais e deve ser guardado com cuidado.")
-    if selected:
-        st.subheader("Histórico de pedidos")
-        history = store.quotes(selected)
-        if history:
-            st.dataframe(quote_rows(history), hide_index=True, width="stretch")
-        else:
-            st.info("Este cliente ainda não tem orçamentos.")
+    customers_page(store)
 
 
 def quote_editor():
-    draft = st.session_state.setdefault("draft", {"lines": []})
-    prefix = f"draft_{st.session_state.get('draft_version', 0)}_"
-    key = lambda name: prefix + name
-    editing = draft.get("id") or draft.get("quote_id")
-    hero("ORÇAMENTO PERSONALIZADO", f"{'Editar #' + str(editing).zfill(4) if editing else 'Do desejo à encomenda.'}", "Monte os sabores, confira as condições e salve o pedido com validade de 7 dias.")
-    st.button("Limpar e iniciar outro orçamento", on_click=fresh_draft)
-    clients = store.list("customers")
-    if not clients:
-        st.info("Cadastre o primeiro cliente antes de montar um orçamento.")
-        st.button("Cadastrar cliente", on_click=go, args=("Clientes",))
-        return
-    ids = [c["id"] for c in clients]
-    selected_id = draft.get("customer_id", ids[0])
-    customer_id = st.selectbox("Cliente *", ids, index=ids.index(selected_id) if selected_id in ids else 0,
-                               format_func=lambda x: next(f"{c['name']} · {c['phone']}" for c in clients if c["id"] == x), key=key("client"))
-    client = next(c for c in clients if c["id"] == customer_id)
-    a, b, c = st.columns(3)
-    initial_event = datetime.fromisoformat(draft["event_at"]) if draft.get("event_at") else datetime.combine(date.today() + timedelta(days=7), time(14))
-    event_date = a.date_input("Data de saída / retirada *", initial_event.date(), key=key("event_date"))
-    event_time = b.time_input("Horário de saída *", initial_event.time(), key=key("event_time"))
-    fulfillment = c.selectbox("Modalidade", ["Retirada", "Entrega"], index=1 if draft.get("fulfillment") == "Entrega" else 0, key=key("fulfillment"))
-    address = st.text_input("Endereço para este pedido (se entrega)", draft.get("delivery_address", client["address"]), key=key("address") + str(customer_id))
-
-    st.subheader("1 · Monte os itens")
-    products = [p for p in store.list("products") if p["active"]]
-    if not products:
-        st.warning("Ative ou cadastre produtos no catálogo para adicionar itens.")
-    else:
-        with st.container(border=True):
-            product_id = st.selectbox("Produto", [p["id"] for p in products], format_func=lambda x: next(p["name"] for p in products if p["id"] == x), key=key("product"))
-            product = next(p for p in products if p["id"] == product_id)
-            product_key = key(f"product_{product_id}_")
-            price, promo = active_price(product)
-            st.caption(f"Preço vigente: {brl(price)}/{product['unit']}" + (" · PROMOÇÃO" if promo else ""))
-            is_cake = product["category"] in CATEGORIES[:2]
-            min_qty = 2.0 if product["category"] == CATEGORIES[0] else 0.1 if is_cake else 1.0
-            quantity = st.number_input(f"Quantidade ({product['unit']})", min_value=min_qty, max_value=100000.0, value=max(min_qty, 1.0), step=0.1 if is_cake else 1.0, format="%.2f" if is_cake else "%.0f", key=product_key + "qty")
-            fillings, extras, flavors = [], [], []
-            brigadeiro_type, split = None, False
-            if is_cake:
-                st.markdown("**Recheios simples**" if product["category"] == CATEGORIES[0] else "**Recheios especiais**")
-                options = SIMPLE_FILLINGS if product["category"] == CATEGORIES[0] else SPECIAL_FILLINGS
-                cols = st.columns(2)
-                for i, filling in enumerate(options):
-                    if cols[i % 2].checkbox(filling, key=product_key + filling):
-                        fillings.append(filling)
-                st.caption("Os adicionais abaixo têm preço pelo item inteiro, não por kg. Preencha manualmente ou marque cortesia.")
-                for extra in EXTRAS:
-                    if st.checkbox(extra, key=product_key + extra):
-                        a, b = st.columns(2)
-                        amount = money(f"{extra} · valor total (R$)", key=product_key + extra + "amount")
-                        free = b.checkbox("Brinde / Cortesia", key=product_key + extra + "gift")
-                        extras.append({"name": extra, "amount_cents": amount, "gift": free})
-            if product["category"] == CATEGORIES[2]:
-                brigadeiro_type = st.selectbox("Categoria dos brigadeiros", BRIGADEIRO_TYPES, key=product_key + "type")
-                st.caption("O preço é o deste produto no catálogo. Cadastre produtos separados para categorias com preços diferentes.")
-                split = st.checkbox("Dividir cento em 50/50", key=product_key + "split")
-                flavors = [st.text_input("Sabor 1", key=product_key + "flavor1")]
-                if split:
-                    flavors.append(st.text_input("Sabor 2", key=product_key + "flavor2"))
-                    st.caption("Cada cento contém 50 unidades do sabor 1 e 50 do sabor 2.")
-            details = st.text_area("Detalhes deste item (tamanho, decoração, personalização)", key=product_key + "details")
-            gift = st.checkbox("Este item inteiro é Brinde / Cortesia", key=product_key + "gift")
-            if st.button("＋ Adicionar ao orçamento", type="primary", key=key("add")):
-                try:
-                    draft["lines"].append(make_line(product, quantity, fillings, extras, details, gift, brigadeiro_type, split, flavors))
-                    st.toast("Item adicionado ao orçamento.")
-                except ValueError as exc:
-                    st.error(str(exc))
-
-    st.subheader("2 · Confira sua composição")
-    if not draft["lines"]:
-        st.info("Seu orçamento ainda está vazio.")
-    for i, line in enumerate(draft["lines"]):
-        with st.container(border=True):
-            left, right = st.columns([5, 1])
-            left.markdown(f"**{quantity_text(line['quantity'])} {line['unit']} · {line['name']}**" + (" · [BRINDE]" if line["gift"] else ""))
-            left.write(" · ".join(line["fillings"] + line["flavors"]))
-            for extra in line["extras"]:
-                left.write(f"＋ {extra['name']} · " + ("[BRINDE]" if extra["gift"] or line["gift"] else brl(extra["amount_cents"])))
-            if line["details"]:
-                left.caption(line["details"])
-            right.markdown(f"**{brl(line['total_cents'])}**")
-            if right.button("Remover", key=key(f"remove_{i}")):
-                draft["lines"].pop(i)
-                st.rerun()
-
-    st.subheader("3 · Condições e cuidados")
-    a, b = st.columns(2)
-    payment_method = a.selectbox("Forma de pagamento acordada", PAYMENT_METHODS, index=PAYMENT_METHODS.index(draft.get("payment_method", "PIX")), key=key("method"))
-    pix_enabled = b.checkbox("Aplicar desconto PIX / Dinheiro manualmente", value=bool(draft.get("pix_enabled", False)), disabled=payment_method == "Cartão", key=key("pix"))
-    if payment_method == "Cartão":
-        pix_enabled = False
-    pix_percent = st.number_input("Percentual PIX / Dinheiro (%)", min_value=0.0, max_value=100.0, value=float(draft.get("pix_percent", 0)), step=0.5, disabled=not pix_enabled, key=key("percent"))
-    if any(line["promotional"] for line in draft["lines"]):
-        st.warning("Há itens em promoção. Confira antes de ativar o desconto PIX: ele será acumulado somente se você marcar a opção.")
-    a, b = st.columns(2)
-    with a:
-        discount = money("Desconto manual geral (R$)", draft.get("discount_cents", 0), key=key("discount"))
-    with b:
-        delivery = money("Taxa de entrega / frete (R$)", draft.get("delivery_cents", 0), key=key("delivery"))
-    st.caption("O percentual PIX é aplicado sobre os itens após o desconto geral. O frete não recebe desconto percentual.")
-    notes = st.text_area("Observações gerais · avisos e condições para o cliente", draft.get("notes", ""), key=key("notes"))
-    production_notes = st.text_area("Decoração, alergias, restrições e transporte · também aparecem na ficha da cozinha", draft.get("production_notes", ""), key=key("production"))
-    draft.update({"customer_id": customer_id, "event_at": datetime.combine(event_date, event_time).isoformat(timespec="minutes"),
-                  "fulfillment": fulfillment, "delivery_address": address, "payment_method": payment_method,
-                  "pix_enabled": pix_enabled, "pix_percent": str(pix_percent), "discount_cents": discount,
-                  "delivery_cents": delivery, "notes": notes, "production_notes": production_notes})
-    reference = st.file_uploader("Foto de referência do bolo / pedido", ["jpg", "jpeg", "png", "webp"], key=key("reference"))
-    remove_ref = st.checkbox("Remover referência anterior", key=key("remove_ref"))
-    if draft.get("reference_photo") and not remove_ref:
-        image(draft["reference_photo"], width=220)
-    try:
-        summary = totals(draft["lines"], discount, delivery, pix_enabled, pix_percent, payment_method)
-    except ValueError as exc:
-        st.error(str(exc))
-        return
-    a, b, c, d = st.columns(4)
-    a.metric("Preço Cartão", brl(summary["card_cents"]))
-    b.metric("PIX / Dinheiro" if pix_enabled else "Total acordado", brl(summary["total_cents"]))
-    c.metric("Entrada mínima · 50%", brl(summary["deposit_cents"]))
-    d.metric("Descontos", brl(discount + summary["pix_discount_cents"]))
-    if st.button("Salvar orçamento", type="primary", disabled=not draft["lines"], key=key("save")):
-        try:
-            if fulfillment == "Entrega" and not address.strip():
-                raise ValueError("Informe o endereço de entrega.")
-            ref = store.save_image(reference) if reference else "" if remove_ref else draft.get("reference_photo", "")
-            payload = {"customer_id": customer_id, "event_at": datetime.combine(event_date, event_time).isoformat(timespec="minutes"),
-                       "fulfillment": fulfillment, "delivery_address": address.strip(), "lines": draft["lines"],
-                       "payment_method": payment_method, "pix_enabled": pix_enabled, "pix_percent": str(pix_percent),
-                       "discount_cents": discount, "delivery_cents": delivery, "notes": notes.strip(),
-                       "production_notes": production_notes.strip(), "reference_photo": ref}
-            quote_id = store.save_quote(payload, editing)
-            draft["quote_id"] = quote_id
-            draft["reference_photo"] = ref
-            st.success(f"Orçamento #{quote_id:04d} salvo. Acesse Orçamentos e pagamentos para gerar PDFs e registrar recebimentos.")
-        except ValueError as exc:
-            st.error(str(exc))
-
+    quote_editor_page(store)
 
 def quotes_page():
-    hero("PEDIDOS & RECEBIMENTOS", "Combinado, registrado.", "Receba o sinal, reserve a data e acompanhe o saldo até a entrega.")
+    hero("ATENDIMENTO", "Pedidos e pagamentos", "Do orçamento aprovado à entrega, acompanhe cada encomenda.")
     quotes = store.quotes()
     if not quotes:
         st.info("Nenhum orçamento salvo ainda.")
@@ -411,8 +234,14 @@ def quotes_page():
     if not filtered:
         st.info("Nenhum orçamento com este filtro.")
         return
-    st.dataframe(quote_rows(filtered), hide_index=True, width="stretch")
-    quote_id = st.selectbox("Abrir pedido", [q["id"] for q in filtered], format_func=lambda x: next(f"#{q['id']:04d} · {q['customer']['name']} · {formatted_date(q['event_at'])}" for q in filtered if q["id"] == x))
+    table(quote_rows(filtered))
+    ids = [q["id"] for q in filtered]
+    requested = st.session_state.pop("quote_to_open", None)
+    if requested in ids:
+        st.session_state["selected_quote"] = requested
+    if st.session_state.get("selected_quote") not in ids:
+        st.session_state.pop("selected_quote", None)
+    quote_id = st.selectbox("Abrir pedido", ids, format_func=lambda x: next(f"#{q['id']:04d} · {q['customer']['name']} · {formatted_date(q['event_at'])}" for q in filtered if q["id"] == x), key="selected_quote")
     q = next(q for q in filtered if q["id"] == quote_id)
     st.subheader(f"#{q['id']:04d} · {q['customer']['name']}")
     st.info(q["status"] + f" · Validade: {date.fromisoformat(q['valid_until']):%d/%m/%Y}")
@@ -450,7 +279,7 @@ def quotes_page():
     with payments_tab:
         history = store.payments(q["id"])
         if history:
-            st.dataframe([{"Recebido em": formatted_date(p["received_at"]), "Valor": brl(p["amount_cents"]), "Forma": p["method"], "Descrição": p["note"]} for p in history], hide_index=True, width="stretch")
+            table([{"Recebido em": formatted_date(p["received_at"]), "Valor": brl(p["amount_cents"]), "Forma": p["method"], "Descrição": p["note"]} for p in history])
         if q["balance_cents"] > 0 and q["status"] != "Vencido":
             remaining_deposit = max(0, q["totals"]["deposit_cents"] - q["paid_cents"])
             with st.form(f"receive_{q['id']}_{q['paid_cents']}"):
@@ -484,9 +313,13 @@ def quotes_page():
 
 
 def agenda():
-    hero("AGENDA DE PRODUÇÃO", "Tempo para cada detalhe.", "Apenas encomendas com entrada mínima de 50% e ainda não entregues aparecem na produção.")
+    hero("PRODUÇÃO", "Agenda da cozinha", "Organize os pedidos confirmados por dia e horário de saída.")
     approved = [q for q in store.quotes() if "Data Reservada" in q["status"]]
-    month = st.date_input("Mês da agenda", value=date.today(), key="agenda_month")
+    from confeitaria.presentation import MONTHS
+    a, b = st.columns([2, 1])
+    month_number = a.selectbox("Mês da agenda", list(range(1, 13)), index=date.today().month - 1, format_func=lambda n: MONTHS[n - 1], key="agenda_month")
+    year = b.number_input("Ano da agenda", min_value=2020, max_value=2100, value=date.today().year, step=1, key="agenda_year")
+    month = date(year, month_number, 1)
     selected = st.session_state.get("agenda_day", date.today())
     st.subheader(f"{['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][month.month - 1]} {month.year}")
     columns = st.columns(7)
@@ -499,10 +332,12 @@ def agenda():
                 count = sum(1 for q in approved if q["event_at"][:10] == day_date.isoformat())
                 if col.button(f"{day}" + (f" · {count} pedido(s)" if count else ""), key=f"day_{day_date}", type="primary" if day_date == selected else "secondary", width="stretch"):
                     st.session_state["agenda_day"] = day_date
+                    st.session_state["agenda_selected_date_text"] = day_date.strftime("%d/%m/%Y")
                     st.rerun()
     st.divider()
-    selected = st.date_input("Encomendas do dia", value=selected, key="agenda_selected_date")
-    # O date_input mantém seu estado; o clique no calendário atualiza este widget no próximo ciclo.
+    selected = date_field("Encomendas do dia", selected, key="agenda_selected_date")
+    if selected is None:
+        return
     daily = [q for q in approved if q["event_at"][:10] == selected.isoformat()]
     if not daily:
         st.info("Nenhuma encomenda aprovada para esta data.")
@@ -517,7 +352,7 @@ def agenda():
 
 
 def settings_page():
-    hero("CONFIGURAÇÕES", "A identidade da sua confeitaria.", "Personalize os documentos e mantenha uma cópia segura dos dados locais.")
+    hero("SUA CONFEITARIA", "Configurações", "Identidade da loja, documentos e cópias de segurança.")
     settings = store.settings()
     with st.form("settings"):
         name = st.text_input("Nome da confeitaria *", settings["name"])
@@ -537,20 +372,31 @@ def settings_page():
                 st.error(str(exc))
     if settings["logo"]:
         image(settings["logo"], width=180)
-    st.subheader("Backup local")
+    st.subheader("Cópia de segurança")
     st.write("O arquivo ZIP reúne uma cópia consistente do SQLite e todas as fotos. Faça backup regularmente e antes de atualizar o aplicativo.")
-    if st.button("Preparar backup"):
-        st.download_button("↓ Baixar backup completo", store.backup(), f"confeitaria-backup-{date.today()}.zip", mime="application/zip")
+    if st.button("Preparar cópia de segurança"):
+        st.download_button("Baixar cópia completa", store.backup(), f"confeitaria-backup-{date.today()}.zip", mime="application/zip")
     st.caption(f"Banco: {store.db_path} · Fotos: {store.media_dir}")
     st.caption("Para restaurar: feche o aplicativo, preserve a pasta atual e extraia dados/ e midia/ do backup na pasta do projeto. Instruções completas no README.")
 
 
+if "_navigate" in st.session_state:
+    st.session_state["page"] = st.session_state.pop("_navigate")
+
+
+def navigation_changed():
+    if st.session_state.get("page") == "Clientes":
+        change_customer_view()
+
+
 with st.sidebar:
-    st.markdown("## 🧁 Doce Ateliê")
+    st.markdown('<div class="brand"><div class="brand-icon">🧁</div><div><strong>Doce Ateliê</strong><small>GESTÃO DA CONFEITARIA</small></div></div>', unsafe_allow_html=True)
     st.caption(store.settings()["name"])
-    page = st.radio("Navegação", ["Visão geral", "Catálogo", "Insumos e estoque", "Clientes", "Novo orçamento", "Orçamentos e pagamentos", "Agenda de produção", "Configurações"], key="page")
-    st.divider()
-    st.caption("LOCAL POR NATUREZA\n\nSQLite + fotos no seu computador. Sem serviços externos obrigatórios.")
+    st.markdown('<div class="nav-caption">SEU ESPAÇO DE TRABALHO</div>', unsafe_allow_html=True)
+    page_labels = {"Visão geral": "◫  Visão geral", "Catálogo": "▦  Produtos", "Insumos e estoque": "▣  Estoque e insumos", "Clientes": "♧  Clientes", "Novo orçamento": "＋  Novo orçamento", "Orçamentos e pagamentos": "▤  Pedidos e pagamentos", "Agenda de produção": "▦  Agenda da cozinha", "Configurações": "⚙  Configurações"}
+    page = st.radio("Navegação", list(page_labels), format_func=page_labels.get, key="page", label_visibility="collapsed", on_change=navigation_changed)
+    st.markdown('<div class="sidebar-footer"><strong>Feito para o seu dia a dia</strong><span>Seus pedidos organizados.<br>Seus dados sempre com você.</span></div>', unsafe_allow_html=True)
+
 if "notice" in st.session_state:
     st.success(st.session_state.pop("notice"))
 

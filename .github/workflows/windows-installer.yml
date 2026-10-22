@@ -6,6 +6,9 @@ on:
       - codex/doce-atelie
 permissions:
   contents: read
+concurrency:
+  group: instalador-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
     runs-on: windows-2022

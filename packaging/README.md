@@ -4,7 +4,7 @@ O empacotamento produz um **instalador Windows x64** e uma versão portátil. Py
 
 ## Experiência do cliente
 
-1. Executar `DoceAtelie-Instalador-1.0.0-Windows-x64.exe`.
+1. Executar `DoceAtelie-Instalador-1.1.0-Windows-x64.exe`.
 2. Seguir o instalador em português. A instalação é por usuário, sem exigir administrador.
 3. Abrir **Doce Ateliê** pelo menu Iniciar ou pelo atalho da área de trabalho.
 4. O navegador abre automaticamente quando o sistema está pronto. Manter a pequena janela Doce Ateliê aberta durante o uso.
@@ -34,8 +34,8 @@ Abra PowerShell na raiz do projeto:
 
 ```powershell
 .\packaging\build-windows.ps1
-# Versão de atualização, se necessário:
-.\packaging\build-windows.ps1 -Version 1.0.1
+# Outra versão de atualização, se necessário:
+.\packaging\build-windows.ps1 -Version 1.1.1
 ```
 
 Se a política local bloquear scripts, ela precisa permitir esse script revisado conforme as regras do computador. Não é necessário mudar a política global.
@@ -44,7 +44,7 @@ O script cria `.venv-build`, instala dependências, executa os testes, empacota 
 
 ```text
 dist\DoceAtelie\DoceAtelie.exe
-dist\instalador\DoceAtelie-Instalador-1.0.0-Windows-x64.exe
+dist\instalador\DoceAtelie-Instalador-1.1.0-Windows-x64.exe
 ```
 
 O teste do binário verifica SQLite, mídia, orçamento/sinal, os dois PDFs, backup, resposta HTTP, renderização da interface por WebSocket e encerramento do servidor. Todo teste usa perfil temporário e não altera dados reais.
@@ -59,6 +59,8 @@ O arquivo `.github/workflows/windows-installer.yml` inclui um fluxo manual de co
 4. Baixe **DoceAtelie-Instalador-Windows-x64** em Artifacts. Extraia o ZIP recebido e envie o instalador `.exe` ao cliente.
 
 O workflow não publica releases nem distribui o programa automaticamente. Consome a disponibilidade/cota de GitHub Actions do repositório. Preserve o mesmo AppId do instalador nas atualizações para manter a identidade do aplicativo.
+
+Na branch `codex/doce-atelie`, o envio de alterações também inicia a geração automaticamente. Execuções anteriores dessa branch são canceladas quando uma nova compilação começa. A versão 1.1 mantém o AppId da versão 1.0 e migra os cadastros existentes automaticamente, com cópia do banco antes da migração. Feche o aplicativo antes de instalar a atualização.
 
 ## Validação antes de distribuir
 

@@ -8,6 +8,18 @@ O projeto inclui um inicializador com janela própria, empacotamento PyInstaller
 
 Consulte [como gerar e distribuir o instalador](packaging/README.md). O `.exe` precisa ser compilado e validado no Windows; há um workflow manual no GitHub Actions preparado para isso.
 
+## Interface renovada · versão 1.1
+
+Navegação lateral, cartões com fotos, pesquisa de clientes, ações de cadastro visíveis e controles de calendário e upload em português. As telas se adaptam a janelas menores.
+
+- **Clientes:** lista com busca por nome, telefone, e-mail ou CPF; botões Ver cadastro, Editar e Excluir. Formulário com nome, CPF, WhatsApp, telefone adicional, e-mail, CEP, rua, número, complemento, bairro, cidade, UF, ponto de referência, foto e observações.
+- **Exclusão com confirmação:** clientes sem pedidos podem ser excluídos. Com pedidos, a ação passa a Arquivar e mantém o histórico financeiro. Use o filtro Arquivados para restaurar um cadastro.
+- **Novo orçamento em quatro etapas:** Cliente → Produtos → Pagamento → Revisão. O resumo acompanha o preenchimento; é possível voltar sem perder os dados e editar ou remover os itens antes de salvar.
+- **Novo cliente dentro do orçamento:** o cadastro abre em uma janela, sem abandonar o pedido; ao salvar, o cliente fica selecionado.
+- **Atualização dos dados:** bancos da versão anterior são migrados automaticamente, com cópia do banco antes da mudança em `dados/copias_antes_atualizacao/`. Os endereços antigos permanecem disponíveis, sem tentativa de separação automática. Preencha os novos campos quando editar o cliente. Fotos, pedidos e pagamentos existentes são preservados.
+
+As imagens em `docs/imagens/` usam dados fictícios para mostrar as telas.
+
 ## Executar
 
 Instale **Python 3.10+** (recomendado: 3.12). No terminal, dentro desta pasta:
@@ -38,10 +50,10 @@ python -m venv .venv
 
 1. Em **Configurações**, cadastre nome, telefone, documento, endereço, logo e prazo de alterações da confeitaria.
 2. Em **Catálogo**, revise os produtos iniciais. Bolo Simples começa em **R$ 75/kg** e Bolo Especial em **R$ 85/kg**. Os outros produtos começam **sem preço**, para você definir seus valores reais. Preço zero só permite adicionar como cortesia. Cadastre variantes separadas para brigadeiros Tradicionais, Especiais ou Personalizados com preços diferentes.
-3. Cadastre os **Clientes**, com WhatsApp/DDD, CPF opcional, endereço e foto. CPF preenchido tem seus dígitos verificadores validados.
+3. Em **Clientes → Novo cliente**, preencha contato e endereço nos campos separados. Nome e WhatsApp são obrigatórios; CPF e os demais campos são opcionais. CPF, CEP e e-mail preenchidos são validados.
 4. Cadastre insumos em **Insumos e estoque**. O valor pago é **por embalagem**; o custo unitário é esse valor dividido pelo conteúdo em g, ml ou unidade. Ex.: R$ 5,00 por 1.000 ml = R$ 0,0050/ml. Quantidade em estoque corresponde ao número de embalagens da unidade indicada.
-5. Em **Novo orçamento**, selecione cliente, saída/retirada, produtos, recheios, adicionais e condições. Salve.
-6. Em **Orçamentos e pagamentos**, abra o pedido, baixe os PDFs e registre apenas os pagamentos efetivamente recebidos.
+5. Em **Novo orçamento**, selecione o cliente (ou cadastre um novo ali mesmo), informe data e entrega, adicione os produtos, defina o pagamento e revise. Finalize com **Salvar orçamento e abrir pedido**.
+6. Em **Pedidos e pagamentos**, abra o pedido, baixe os PDFs e registre apenas os pagamentos efetivamente recebidos.
 7. Em **Agenda de produção**, clique no dia para visualizar os pedidos reservados em ordem de horário e baixar as fichas da cozinha.
 
 ## Regras implementadas
@@ -57,7 +69,7 @@ python -m venv .venv
 - Pagamentos parciais são somados. O sinal mínimo de 50% é arredondado para cima no centavo indivisível. Ao atingir esse valor, o pedido vira **Aprovado / Data Reservada**. Quitação integral gera **Quitado / Data Reservada**. Entrega só é registrada após quitação. O saldo corresponde ao total menos os recebimentos reais; pode diferir de 50% se o sinal recebido for outro valor.
 - A caixa “Entrada de 50% recebida” identifica o lançamento; a aprovação depende do **valor efetivamente recebido**, não apenas da marcação. O campo de recebimento sugere o valor que falta para o sinal, ou o saldo final se já aprovado. É preciso confirmar o recebimento.
 - A agenda mostra apenas pedidos aprovados/quitados ainda não entregues. Permite vários pedidos no mesmo horário; não impõe capacidade de produção nem bloqueia horários automaticamente.
-- Orçamentos sem pagamento podem ser editados. Após qualquer recebimento, composição e valores ficam preservados. Não há exclusão de lançamentos, estorno, cancelamento financeiro ou alteração de pedidos pagos nesta versão.
+- Orçamentos sem pagamento podem ser editados. No assistente, cada item tem ações de edição e remoção. Após qualquer recebimento, composição e valores ficam preservados. Não há exclusão de lançamentos, estorno, cancelamento financeiro ou alteração de pedidos pagos nesta versão.
 - Dados da loja, cliente, preços e condições são copiados para o pedido ao salvar. Alterações cadastrais posteriores não reescrevem documentos históricos. Ao editar um pedido sem pagamentos, os dados cadastrais são atualizados nessa nova gravação.
 
 ## Documentos
@@ -77,7 +89,7 @@ midia/                     # fotos de produtos, clientes, insumos, referências 
 
 As pastas são criadas automaticamente e ignoradas pelo Git, assim como `.venv/`. Fotos retiradas de um cadastro não são apagadas fisicamente, preservando referências históricas. Faça backup periódico e controle o espaço em disco.
 
-Em **Configurações → Preparar backup**, baixe o ZIP com snapshot consistente do SQLite e todas as mídias. **Para restaurar**, encerre todos os processos do aplicativo, preserve uma cópia das pastas atuais e extraia `dados/` e `midia/` do backup na pasta do projeto. Reinicie e confira os pedidos. Nunca substitua o banco enquanto o aplicativo estiver em execução.
+Em **Configurações → Preparar cópia de segurança**, baixe o ZIP com snapshot consistente do SQLite e todas as mídias. **Para restaurar**, encerre todos os processos do aplicativo, preserve uma cópia das pastas atuais e extraia `dados/` e `midia/` do backup na pasta do projeto. Reinicie e confira os pedidos. Nunca substitua o banco enquanto o aplicativo estiver em execução.
 
 Para separar dados do código, defina `CONFEITARIA_DATA_DIR` e `CONFEITARIA_MEDIA_DIR` com diretórios locais de sua escolha. Na restauração, use esses diretórios correspondentes. Não use diretórios compartilhados por rede para o banco SQLite.
 
@@ -92,4 +104,4 @@ Os dados incluem CPF, endereço e foto. O aplicativo não oferece login nem crip
 
 Os testes usam bancos e imagens temporários e não alteram dados reais. Cobrem cálculos, promoções, brindes, recheios, divisão 50/50, persistência, validade, pagamentos, reserva/entrega, backup e extração de texto dos dois PDFs para verificar a ausência de campos financeiros na ficha da cozinha. Os testes de interface usam o AppTest oficial do Streamlit.
 
-Estrutura: `app.py` contém a interface, `confeitaria/domain.py` as regras, `storage.py` a persistência/mídia e `pdf.py` os documentos. O estoque é uma estrutura manual para análise futura: não há ficha técnica de receitas nem consumo automático dos insumos.
+Estrutura: `app.py` contém a navegação e as telas gerais; `confeitaria/ui_customers.py` e `ui_quotes.py`, os cadastros e o assistente; `presentation.py`, os componentes visuais; `domain.py`, as regras; `storage.py`, a persistência/mídia; e `pdf.py`, os documentos. O estoque é uma estrutura manual para análise futura: não há ficha técnica de receitas nem consumo automático dos insumos.
