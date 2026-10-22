@@ -1,0 +1,13 @@
+.git
+.venv
+.venv-build
+__pycache__
+**/__pycache__
+dados
+midia
+build
+dist
+deploy/.env
+.env
+*.log
+.streamlit/secrets.toml

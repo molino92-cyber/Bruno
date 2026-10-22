@@ -56,7 +56,7 @@ class ConfeitariaTests(unittest.TestCase):
     def test_brigadeiro_split(self):
         product = next(p for p in self.products if p["category"] == "Cento de Brigadeiros")
         product["price_cents"] = 12000
-        line = make_line(product, 2, brigadeiro_type="Tradicional", split=True, flavors=["Chocolate", "Ninho"])
+        line = make_line(product, 2, brigadeiro_type="Tradicional", split=True, flavors=["Chocolate", "Beijinho"])
         self.assertTrue(line["split"])
         self.assertEqual(line["total_cents"], 24000)
         with self.assertRaises(ValueError):

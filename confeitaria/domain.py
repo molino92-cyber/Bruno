@@ -8,6 +8,7 @@ SIMPLE_FILLINGS = ["Chocolate", "Ninho", "Chocolate Branco", "Dois Amores"]
 SPECIAL_FILLINGS = ["Ninho com Morango", "Nutella", "Ninho com Nutella", "Chocolate com Morango", "Doce de Leite com Ameixa"]
 EXTRAS = ["Massa de Chocolate", "Brigadeiros no Topo", "Frutas Extras", "Recheios Extras", "Bolo de Andar", "Topo de Bolo Simples", "Topo de Bolo Especial"]
 BRIGADEIRO_TYPES = ["Tradicional", "Especial", "Personalizado"]
+BRIGADEIRO_FLAVORS = {"Tradicional": ["Chocolate", "Beijinho"], "Especial": ["Nutella", "Brigadeiro Rocher", "Ninho", "Ninho com Nutella"], "Personalizado": ["Chocolate", "Beijinho", "Nutella", "Brigadeiro Rocher", "Ninho"]}
 UNITS = ["Cx", "Un", "Kg", "Grama", "Litro"]
 PAYMENT_METHODS = ["PIX", "Dinheiro", "Cartão"]
 STATES = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
@@ -81,31 +82,70 @@ def active_price(product, on_date=None):
     return (int(product["promo_cents"]) if promotional else int(product["price_cents"])), promotional
 
 
-def make_line(product, quantity, fillings=None, extras=None, details="", gift=False, brigadeiro_type=None, split=False, flavors=None):
+def filling_limit(quantity):
+    return 1 if decimal(quantity) < 2 else 2
+
+
+def make_line(product, quantity, fillings=None, extras=None, details="", gift=False, brigadeiro_type=None, split=False, flavors=None,
+              *, allow_extra_fillings=False, allow_under_minimum=False, negotiation_notes="", reference_photo=""):
     qty = decimal(quantity)
     if qty <= 0 or qty > 100000:
         raise ValueError("A quantidade deve ser maior que zero e até 100.000.")
     if product["unit"] != "kg" and qty != qty.to_integral_value():
         raise ValueError("Itens por unidade ou cento exigem quantidade inteira.")
-    if product["category"] == "Bolos Simples" and qty < 2:
-        raise ValueError("O Bolo Simples exige no mínimo 2 kg.")
+    under_minimum = product["category"] in ("Bolos Simples", "Bolos Especiais") and qty < 2
+    if under_minimum and not allow_under_minimum:
+        raise ValueError("Bolos Simples e Especiais exigem no mínimo 2 kg. Confirme a exceção negociada para aceitar um peso menor.")
     fillings = fillings or []
+    excess = False
     if product["category"] in ("Bolos Simples", "Bolos Especiais"):
         allowed = SIMPLE_FILLINGS if product["category"] == "Bolos Simples" else SPECIAL_FILLINGS
-        if not fillings or any(f not in allowed for f in fillings):
+        if not fillings or len(set(fillings)) != len(fillings) or any(f not in allowed for f in fillings):
             raise ValueError("Selecione recheios válidos para a categoria do bolo.")
+        excess = len(fillings) > filling_limit(qty)
+        if excess and not allow_extra_fillings:
+            raise ValueError(f"Para {quantity_text(qty)} kg, o padrão é até {filling_limit(qty)} recheio(s). Confirme a exceção negociada antes de continuar.")
+        if (under_minimum or excess) and not negotiation_notes.strip():
+            raise ValueError("Registre o motivo ou a condição combinada para autorizar a exceção.")
     if product["category"] == "Cento de Brigadeiros":
         if brigadeiro_type not in BRIGADEIRO_TYPES:
             raise ValueError("Selecione a categoria dos brigadeiros.")
         flavors = [f.strip() for f in (flavors or []) if f.strip()]
         if len(flavors) != (2 if split else 1):
             raise ValueError("Informe os dois sabores para dividir 50/50, ou um sabor para o cento inteiro.")
+        if any(flavor not in BRIGADEIRO_FLAVORS[brigadeiro_type] for flavor in flavors):
+            raise ValueError("Selecione sabores válidos para o tipo de brigadeiro.")
+        if split and flavors[0] == flavors[1]:
+            raise ValueError("Escolha dois sabores diferentes para dividir 50/50.")
+        if brigadeiro_type == "Personalizado" and not details.strip():
+            raise ValueError("Descreva o tema e a personalização dos brigadeiros.")
     normalized_extras = []
     for extra in extras or []:
         amount = int(extra["amount_cents"])
         if amount < 0 or not extra["name"].strip():
             raise ValueError("Adicional inválido.")
-        normalized_extras.append({"name": extra["name"].strip(), "amount_cents": amount, "gift": bool(extra.get("gift"))})
+        normalized = {"name": extra["name"].strip(), "amount_cents": amount, "gift": bool(extra.get("gift"))}
+        if "quantity" in extra:
+            units = decimal(extra["quantity"])
+            unit_cents = int(extra.get("unit_cents", 0))
+            if units <= 0 or units != units.to_integral_value() or unit_cents < 0:
+                raise ValueError("Informe quantidade inteira positiva e preço válido para o adicional.")
+            expected = int(units) * unit_cents
+            if amount != expected:
+                raise ValueError("O total do adicional não corresponde à quantidade e ao valor unitário.")
+            normalized.update({"quantity": int(units), "unit_cents": unit_cents})
+        for field in ("brigadeiro_type", "flavors", "personalization", "reference_photo"):
+            if field in extra:
+                normalized[field] = extra[field]
+        if extra.get("brigadeiro_type"):
+            kind = extra["brigadeiro_type"]
+            if kind not in BRIGADEIRO_TYPES or not extra.get("flavors"):
+                raise ValueError("Selecione o tipo e os sabores dos brigadeiros adicionais.")
+            if any(flavor not in BRIGADEIRO_FLAVORS[kind] for flavor in extra["flavors"]):
+                raise ValueError("Selecione sabores válidos para os brigadeiros adicionais.")
+            if kind == "Personalizado" and not extra.get("personalization", "").strip():
+                raise ValueError("Descreva a personalização dos brigadeiros adicionais.")
+        normalized_extras.append(normalized)
     price, promotional = active_price(product)
     if price <= 0 and not gift:
         raise ValueError("Defina um preço no catálogo ou marque o item como cortesia.")
@@ -118,6 +158,9 @@ def make_line(product, quantity, fillings=None, extras=None, details="", gift=Fa
         "fillings": fillings, "extras": normalized_extras, "details": details.strip(),
         "gift": bool(gift), "brigadeiro_type": brigadeiro_type,
         "split": bool(split), "flavors": flavors or [],
+        "description": product.get("description", ""), "composition": list(product.get("composition", [])),
+        "reference_photo": reference_photo,
+        "negotiation": {"extra_fillings": excess, "under_minimum": under_minimum, "notes": negotiation_notes.strip() if (excess or under_minimum) else ""},
         "total_cents": 0 if gift else base + extras_total,
     }
 

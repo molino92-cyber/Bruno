@@ -1,0 +1,9 @@
+<!doctype html><html lang="pt-BR"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#182a35">
+  <link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="stylesheet" href="/mobile.css">
+  <title>Entrar · Doce Ateliê</title><script src="/mobile.js" defer></script>
+</head><body class="login"><main class="login-card"><span class="cupcake">🧁</span><small>SEU ESPAÇO DE TRABALHO</small><h1>Doce Ateliê</h1><p>Seu atendimento e sua produção,<br>organizados onde você estiver.</p>
+  <form method="post" action="/entrar">{% module xsrf_form_html() %}<label for="password">Senha da confeitaria</label><input id="password" type="password" name="password" autocomplete="current-password" required minlength="12"><button class="primary" type="submit">Entrar no sistema</button></form>
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% end %}
+  <p class="small">Acesse pelo Chrome no Android ou Safari no iPhone. Você pode adicionar o sistema à tela inicial.</p>
+</main></body></html>

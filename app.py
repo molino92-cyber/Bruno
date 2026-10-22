@@ -11,7 +11,7 @@ from confeitaria.domain import (BRIGADEIRO_TYPES, CATEGORIES, EXTRAS, PAYMENT_ME
                                 SPECIAL_FILLINGS, UNITS, active_price, brl, cents, make_line, quantity_text, totals)
 from confeitaria.pdf import formatted_date, generate_pdf
 from confeitaria.storage import Store, inventory_cost
-from confeitaria.presentation import apply_theme, date_field, heading, table
+from confeitaria.presentation import apply_theme, date_field, heading, table, media_thumbnail
 from confeitaria.ui_customers import change_customer_view, customers_page
 from confeitaria.ui_quotes import quote_editor_page
 
@@ -20,22 +20,22 @@ apply_theme()
 
 
 @st.cache_resource
-def get_store():
-    return Store()
+def get_store(demo=False):
+    real = Store()
+    if demo:
+        from confeitaria.demo import demonstration_store
+        return demonstration_store(real)
+    return real
 
 
-store = get_store()
+store = get_store(st.session_state.get("demo_mode", False))
 
 
 def hero(label, title, subtitle):
     heading(label, title, subtitle)
 
 def image(name, width=None):
-    path = store.image_path(name)
-    if path:
-        st.image(str(path), width=width or "stretch")
-    else:
-        st.markdown('<div class="placeholder">🧁</div>', unsafe_allow_html=True)
+    media_thumbnail(name, store, height=110 if width else 170)
 
 
 def money(label, value=0, key=None, **kwargs):
@@ -67,11 +67,12 @@ def dashboard():
     quotes = store.quotes()
     approved = [q for q in quotes if "Data Reservada" in q["status"]]
     today = [q for q in approved if q["event_at"][:10] == date.today().isoformat()]
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Saídas de hoje", len(today))
-    c2.metric("Datas reservadas", len(approved))
-    c3.metric("A receber · reservados", brl(sum(q["balance_cents"] for q in approved)))
-    c4.metric("Recebido · acumulado", brl(sum(q["paid_cents"] for q in quotes)))
+    with st.container(key="metrics_dashboard"):
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Saídas de hoje", len(today))
+        c2.metric("Datas reservadas", len(approved))
+        c3.metric("A receber · reservados", brl(sum(q["balance_cents"] for q in approved)))
+        c4.metric("Recebido · acumulado", brl(sum(q["paid_cents"] for q in quotes)))
     st.write("")
     left, right = st.columns([2, 1])
     with left:
@@ -109,7 +110,7 @@ def catalog():
             st.info("Nenhum produto encontrado.")
         columns = st.columns(3)
         for i, product in enumerate(visible):
-            with columns[i % 3], st.container(border=True):
+            with columns[i % 3], st.container(border=True, key=f"card_catalog_{product['id']}"):
                 image(product["photos"][0] if product["photos"] else "")
                 st.caption(product["category"])
                 st.subheader(product["name"])
@@ -135,6 +136,7 @@ def catalog():
             name = a.text_input("Nome do produto *", p.get("name", ""))
             category = b.selectbox("Categoria *", CATEGORIES, index=CATEGORIES.index(p.get("category", CATEGORIES[0])))
             description = st.text_area("Descrição completa", p.get("description", ""))
+            composition = st.text_area("Composição do kit / itens inclusos · um por linha", "\n".join(p.get("composition", [])), help="Exemplo: 1 bolo simples de 2 kg, 10 brigadeiros e 5 cupcakes, cada item em uma linha.")
             a, b = st.columns(2)
             price = money("Preço normal (R$ por kg / cento / unidade)", p.get("price_cents", 0), key=f"price_{selected}")
             active = st.checkbox("Visível no catálogo", value=bool(p.get("active", 1)))
@@ -159,7 +161,8 @@ def catalog():
                     photos = kept + [store.save_image(upload) for upload in uploads]
                     store.save_product({"name": name.strip(), "category": category, "description": description.strip(), "unit": "un",
                                         "price_cents": price, "active": int(active), "promo_enabled": int(enabled), "promo_cents": promo,
-                                        "promo_start": start.isoformat(), "promo_end": end.isoformat(), "photos": photos}, selected)
+                                        "promo_start": start.isoformat(), "promo_end": end.isoformat(), "photos": photos,
+                                        "composition": [item.strip() for item in composition.splitlines() if item.strip()]}, selected)
                     flash("Produto salvo. Orçamentos anteriores mantêm os preços registrados.")
                 except ValueError as exc:
                     st.error(str(exc))
@@ -175,7 +178,7 @@ def inventory():
         st.metric("Valor estimado em estoque", brl(cents(sum(Decimal(i["stock"]) * i["paid_cents"] / 100 for i in items))))
         columns = st.columns(3)
         for n, item in enumerate(filtered):
-            with columns[n % 3], st.container(border=True):
+            with columns[n % 3], st.container(border=True, key=f"card_inventory_{item['id']}"):
                 image(item["photo"])
                 st.subheader(item["name"])
                 st.caption(item["brand"] or "Marca não informada")
@@ -223,33 +226,49 @@ def quote_editor():
 def quotes_page():
     hero("ATENDIMENTO", "Pedidos e pagamentos", "Do orçamento aprovado à entrega, acompanhe cada encomenda.")
     quotes = store.quotes()
+    selected = st.session_state.get("selected_quote")
     if not quotes:
         st.info("Nenhum orçamento salvo ainda.")
         st.button("Criar primeiro orçamento", on_click=fresh_draft)
         return
-    a, b = st.columns(2)
-    search = a.text_input("Buscar cliente ou número do orçamento")
-    status_filter = b.selectbox("Filtrar status", ["Todos", "Em Aberto", "Vencido", "Aprovado / Data Reservada", "Quitado / Data Reservada", "Entregue"])
-    filtered = [q for q in quotes if (status_filter == "Todos" or q["status"] == status_filter) and (search.casefold() in q["customer"]["name"].casefold() or search.lstrip("#").isdigit() and int(search.lstrip("#")) == q["id"])]
-    if not filtered:
-        st.info("Nenhum orçamento com este filtro.")
+    if selected is None:
+        st.button("Novo orçamento", type="primary", on_click=fresh_draft)
+        group = st.radio("Situação dos pedidos", ["Todos", "Abertos", "Fechados"], horizontal=True)
+        st.caption("Abertos: pedidos ainda não entregues, incluindo vencidos. Fechados: entrega / retirada concluída.")
+        a, b = st.columns(2)
+        search = a.text_input("Buscar cliente ou número do orçamento")
+        status_filter = b.selectbox("Filtrar status", ["Todos", "Em Aberto", "Vencido", "Aprovado / Data Reservada", "Quitado / Data Reservada", "Entregue"])
+        filtered = [q for q in quotes if (group == "Todos" or bool(q["delivered"]) == (group == "Fechados")) and (status_filter == "Todos" or q["status"] == status_filter) and (search.casefold() in q["customer"]["name"].casefold() or search.lstrip("#").isdigit() and int(search.lstrip("#")) == q["id"])]
+        st.caption(f"{len(filtered)} pedido(s) encontrado(s) · Clique em Ver pedido para abrir os detalhes.")
+        for q in filtered:
+            with st.container(key=f"order_row_{q['id']}"):
+                a, b, c, d = st.columns([2.4, 1.6, 1.8, 1], vertical_alignment="center")
+                a.markdown(f"**#{q['id']:04d} · {q['customer']['name']}**")
+                a.caption(formatted_date(q["event_at"]))
+                b.write(q["status"])
+                c.markdown(f"**{brl(q['totals']['total_cents'])}**")
+                c.caption("Saldo: " + brl(q["balance_cents"]))
+                def open_order(identifier=q["id"]):
+                    st.session_state["selected_quote"] = identifier
+                d.button("Ver pedido", key=f"open_order_{q['id']}", on_click=open_order, width="stretch")
+        if not filtered:
+            st.info("Nenhum orçamento com este filtro.")
         return
-    table(quote_rows(filtered))
-    ids = [q["id"] for q in filtered]
-    requested = st.session_state.pop("quote_to_open", None)
-    if requested in ids:
-        st.session_state["selected_quote"] = requested
-    if st.session_state.get("selected_quote") not in ids:
+    q = next((q for q in quotes if q["id"] == selected), None)
+    def close_order():
         st.session_state.pop("selected_quote", None)
-    quote_id = st.selectbox("Abrir pedido", ids, format_func=lambda x: next(f"#{q['id']:04d} · {q['customer']['name']} · {formatted_date(q['event_at'])}" for q in filtered if q["id"] == x), key="selected_quote")
-    q = next(q for q in filtered if q["id"] == quote_id)
+    st.button("Voltar para pedidos", icon=":material/arrow_back:", on_click=close_order)
+    if not q:
+        st.info("Pedido não encontrado.")
+        return
     st.subheader(f"#{q['id']:04d} · {q['customer']['name']}")
     st.info(q["status"] + f" · Validade: {date.fromisoformat(q['valid_until']):%d/%m/%Y}")
-    a, b, c, d = st.columns(4)
-    a.metric("Total acordado", brl(q["totals"]["total_cents"]))
-    b.metric("Entrada mínima · 50%", brl(q["totals"]["deposit_cents"]))
-    c.metric("Recebido", brl(q["paid_cents"]))
-    d.metric("Saldo devedor", brl(q["balance_cents"]))
+    with st.container(key="metrics_order"):
+        a, b, c, d = st.columns(4)
+        a.metric("Total acordado", brl(q["totals"]["total_cents"]))
+        b.metric("Entrada mínima · 50%", brl(q["totals"]["deposit_cents"]))
+        c.metric("Recebido", brl(q["paid_cents"]))
+        d.metric("Saldo devedor", brl(q["balance_cents"]))
     st.caption("O saldo é calculado pelos recebimentos reais. Após um sinal exato de 50%, restam 50% a pagar.")
     detail, payments_tab, docs = st.tabs(["Detalhes", "Recebimentos", "PDFs e impressão"])
     with detail:
@@ -263,7 +282,17 @@ def quotes_page():
                 if line["flavors"]:
                     st.write(("Divisão 50/50: " if line["split"] else "Sabor: ") + " / ".join(line["flavors"]) + f" · {line['brigadeiro_type']}")
                 for extra in line["extras"]:
-                    st.write(f"＋ {extra['name']} · " + ("[BRINDE]" if extra["gift"] or line["gift"] else brl(extra["amount_cents"])))
+                    st.write(f"＋ {extra.get('quantity', 1)} × {extra['name']} · " + ("[BRINDE]" if extra["gift"] or line["gift"] else brl(extra["amount_cents"])))
+                    if extra.get("flavors"):
+                        st.caption(extra.get("brigadeiro_type", "") + " · " + " / ".join(extra["flavors"]) + " · " + extra.get("personalization", ""))
+                    if extra.get("reference_photo"):
+                        media_thumbnail(extra["reference_photo"], store, 120, "Inspiração do adicional")
+                if line.get("composition"):
+                    st.write("Inclui: " + "; ".join(line["composition"]))
+                if line.get("negotiation", {}).get("notes"):
+                    st.warning("Exceção autorizada: " + line["negotiation"]["notes"])
+                if line.get("reference_photo"):
+                    media_thumbnail(line["reference_photo"], store, 140, "Inspiração do item")
                 st.write(line["details"])
         st.write("**Observações gerais:**", q["notes"] or "—")
         st.write("**Produção / alergias / transporte:**", q["production_notes"] or "—")
@@ -307,6 +336,16 @@ def quotes_page():
     with docs:
         st.write("Baixe o PDF e use o comando Imprimir do seu leitor de PDFs.")
         st.caption("O orçamento usa os dados e as condições da loja registrados quando foi salvo.")
+        with st.expander("Logo da loja neste orçamento", expanded=not q["shop"].get("logo")):
+            if q["shop"].get("logo"):
+                media_thumbnail(q["shop"]["logo"], store, 100, "Logo da confeitaria")
+            logo = st.file_uploader("Adicionar / trocar logo para gerar o PDF", ["jpg", "jpeg", "png", "webp"], key=f"order_logo_{q['id']}")
+            if st.button("Aplicar logo ao orçamento", disabled=not logo, key=f"apply_logo_{q['id']}"):
+                try:
+                    store.update_quote_logo(q["id"], store.save_image(logo))
+                    flash("Logo atualizada neste orçamento. Os valores e recebimentos foram preservados.")
+                except ValueError as exc:
+                    st.error(str(exc))
         a, b = st.columns(2)
         a.download_button("↓ Orçamento do cliente", generate_pdf(q, store), file_name=f"orcamento-{q['id']:04d}.pdf", mime="application/pdf", key=f"pdf_client_{q['id']}")
         b.download_button("↓ Ficha da cozinha · sem preços", generate_pdf(q, store, kitchen=True), file_name=f"producao-{q['id']:04d}.pdf", mime="application/pdf", key=f"pdf_kitchen_{q['id']}")
@@ -387,18 +426,39 @@ if "_navigate" in st.session_state:
 def navigation_changed():
     if st.session_state.get("page") == "Clientes":
         change_customer_view()
+    if st.session_state.get("page") == "Orçamentos e pagamentos":
+        st.session_state.pop("selected_quote", None)
+
+
+def mobile_navigation_changed():
+    st.session_state["page"] = st.session_state["mobile_page"]
+    navigation_changed()
+
+
+def switch_demo():
+    for key in list(st.session_state):
+        if key != "demo_mode":
+            del st.session_state[key]
 
 
 with st.sidebar:
     st.markdown('<div class="brand"><div class="brand-icon">🧁</div><div><strong>Doce Ateliê</strong><small>GESTÃO DA CONFEITARIA</small></div></div>', unsafe_allow_html=True)
     st.caption(store.settings()["name"])
+    st.toggle("Ver demonstração", key="demo_mode", on_change=switch_demo, help="Exemplos com imagens em um banco separado dos seus dados.")
     st.markdown('<div class="nav-caption">SEU ESPAÇO DE TRABALHO</div>', unsafe_allow_html=True)
     page_labels = {"Visão geral": "◫  Visão geral", "Catálogo": "▦  Produtos", "Insumos e estoque": "▣  Estoque e insumos", "Clientes": "♧  Clientes", "Novo orçamento": "＋  Novo orçamento", "Orçamentos e pagamentos": "▤  Pedidos e pagamentos", "Agenda de produção": "▦  Agenda da cozinha", "Configurações": "⚙  Configurações"}
     page = st.radio("Navegação", list(page_labels), format_func=page_labels.get, key="page", label_visibility="collapsed", on_change=navigation_changed)
     st.markdown('<div class="sidebar-footer"><strong>Feito para o seu dia a dia</strong><span>Seus pedidos organizados.<br>Seus dados sempre com você.</span></div>', unsafe_allow_html=True)
 
+with st.container(key="mobile_navigation"):
+    st.session_state["mobile_page"] = page
+    st.selectbox("Ir para", list(page_labels), format_func=page_labels.get, key="mobile_page", on_change=mobile_navigation_changed)
+
 if "notice" in st.session_state:
     st.success(st.session_state.pop("notice"))
+
+if st.session_state.get("demo_mode"):
+    st.info("Modo demonstração · Clientes, imagens, pedidos e preços fictícios. Desative Ver demonstração para voltar aos seus dados.")
 
 # Sincronizar o calendário antes de instanciar o seletor de dia.
 if page == "Agenda de produção" and st.session_state.get("agenda_day") != st.session_state.get("agenda_last_day"):

@@ -89,6 +89,32 @@ def apply_theme():
     .data-table {width:100%;border-collapse:collapse;font-size:.83rem;background:#fff;border-radius:10px;overflow:hidden;}
     .data-table th {background:#f0f3f5;text-align:left;padding:12px;color:#7c8c96;font-size:.72rem;font-weight:600;}
     .data-table td {padding:13px 12px;color:#3f5663;border-bottom:1px solid #edf1f3;}
+    .media-frame {width:100%;height:170px;background:#faf4ee;border-radius:11px;overflow:hidden;display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
+    .media-frame img {width:100%;height:100%;object-fit:contain;display:block;}
+    .st-key-mobile_navigation {display:none;}
+    @media(max-width:850px) {
+      .st-key-mobile_navigation {display:block;}
+      [class*="st-key-metrics_"] [data-testid="stHorizontalBlock"] {flex-wrap:wrap;gap:10px;}
+      [class*="st-key-metrics_"] [data-testid="stColumn"] {flex:1 1 calc(50% - 10px)!important;min-width:0!important;}
+      .st-key-metrics_customers [data-testid="stColumn"] {flex-basis:calc(33.33% - 10px)!important;}
+      [class*="st-key-metrics_"] [data-testid="stMetric"] {padding:12px;min-height:104px;}
+      [class*="st-key-metrics_"] [data-testid="stMetricValue"] {font-size:1.25rem;}
+      [class*="st-key-metrics_"] [data-testid="stMetricLabel"] p {font-size:.68rem;}
+      .st-key-customer_sheet {overflow-x:auto;}
+      .st-key-customer_sheet [data-testid="stHorizontalBlock"] {flex-wrap:nowrap;min-width:980px;}
+      .st-key-customer_sheet [data-testid="stColumn"] {flex:1 1 0!important;min-width:0!important;}
+      .st-key-customer_sheet [data-testid="stColumn"]:first-child {flex:2.8 1 0!important;}
+      .st-key-customer_sheet [data-testid="stColumn"]:nth-child(2) {flex:1.6 1 0!important;}
+      .st-key-customer_sheet [data-testid="stColumn"]:nth-child(3) {flex:2.1 1 0!important;}
+      .st-key-customer_sheet [data-testid="stColumn"]:nth-child(4) {flex:1.4 1 0!important;}
+    }
+    [class*="st-key-customer_row_"], [class*="st-key-order_row_"] {background:white;border-bottom:1px solid #e5e9ed;padding:9px 12px;}
+    [class*="st-key-customer_row_"] .profile-heading {margin:0;gap:9px;}
+    [class*="st-key-customer_row_"] .avatar {width:34px;height:34px;font-size:12px;}
+    [class*="st-key-customer_row_"] .profile-heading strong {font-size:.83rem;}
+    [class*="st-key-customer_row_"] .profile-heading small {font-size:.69rem;margin-top:2px;}
+    [class*="st-key-customer_row_"] p, [class*="st-key-order_row_"] p {font-size:.79rem;overflow-wrap:anywhere;}
+    [class*="st-key-customer_row_"] button {font-size:.73rem;min-height:32px;padding:4px 7px;}
     [data-testid="stFileUploaderDropzoneInstructions"] {font-size:0!important;}
     [data-testid="stFileUploaderDropzoneInstructions"]>div,[data-testid="stFileUploaderDropzoneInstructions"] span,[data-testid="stFileUploaderDropzoneInstructions"] small {display:none!important;}
     [data-testid="stFileUploaderDropzoneInstructions"]:after {content:'Arraste uma imagem aqui';font-size:12px;color:#80919c;}
@@ -98,13 +124,35 @@ def apply_theme():
     [data-testid="stMain"] [role="radiogroup"] {gap:7px;}
     [data-testid="stMain"] [role="radiogroup"]>label {border:1px solid #e0e6e9;background:#fff;border-radius:8px;padding:7px 11px;}
     [data-testid="stMain"] [role="radiogroup"]>label:has(input:checked) {border-color:#e8b39f;background:#fff1ea;}
-    @media(max-width:850px) {.block-container{padding:1.5rem 1rem;} .wizard-steps{gap:4px;} .wizard-step{padding:10px 5px;font-size:.7rem;} .wizard-step b{margin-right:3px;} h1{font-size:1.65rem!important;}}
+    @media(max-width:850px) {.block-container{padding:1.5rem 1rem;} .wizard-steps{gap:4px;} .wizard-step{padding:10px 5px;font-size:.7rem;} .wizard-step b{margin-right:3px;} h1{font-size:1.65rem!important;} [class*="st-key-customer_row_"] [data-testid="stHorizontalBlock"], [class*="st-key-order_row_"] [data-testid="stHorizontalBlock"] {gap:6px;} .data-table {display:block;overflow-x:auto;} input,textarea {font-size:16px!important;} }
     @media print {[data-testid="stSidebar"] {display:none;}}
     </style>""", unsafe_allow_html=True)
 
 
 def heading(label, title, subtitle=""):
     st.markdown(f'<div class="hero"><div class="eyebrow">{escape(label)}</div><h1>{escape(title)}</h1><p>{escape(subtitle)}</p></div>', unsafe_allow_html=True)
+
+
+@st.cache_data(max_entries=120, show_spinner=False)
+def _thumbnail(path, modified):
+    from io import BytesIO
+    from PIL import Image, ImageOps
+    with Image.open(path) as original:
+        thumb = ImageOps.exif_transpose(original).convert("RGBA")
+        thumb.thumbnail((700, 420))
+        output = BytesIO()
+        thumb.save(output, "PNG")
+    return base64.b64encode(output.getvalue()).decode()
+
+
+def media_thumbnail(name, store, height=170, label="Foto do produto"):
+    path = store.image_path(name)
+    if path:
+        encoded = _thumbnail(str(path), path.stat().st_mtime_ns)
+        content = f'<img alt="{escape(label, quote=True)}" src="data:image/png;base64,{encoded}">'
+    else:
+        content = '<span aria-label="Sem foto cadastrada" style="font-size:2rem">🧁</span>'
+    st.markdown(f'<div class="media-frame" style="height:{int(height)}px">{content}</div>', unsafe_allow_html=True)
 
 
 def avatar_html(customer, store):

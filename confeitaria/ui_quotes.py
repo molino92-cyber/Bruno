@@ -5,9 +5,9 @@ import hashlib
 
 import streamlit as st
 
-from .domain import (BRIGADEIRO_TYPES, CATEGORIES, EXTRAS, PAYMENT_METHODS, SIMPLE_FILLINGS,
-                     SPECIAL_FILLINGS, active_price, brl, cents, customer_address, make_line, quantity_text, totals)
-from .presentation import date_field, detail, empty_state, heading, profile_heading, quote_summary, stepper
+from .domain import (BRIGADEIRO_TYPES, BRIGADEIRO_FLAVORS, CATEGORIES, EXTRAS, PAYMENT_METHODS, SIMPLE_FILLINGS,
+                     SPECIAL_FILLINGS, active_price, brl, cents, customer_address, filling_limit, make_line, quantity_text, totals)
+from .presentation import date_field, detail, empty_state, heading, media_thumbnail, profile_heading, quote_summary, stepper
 from .ui_customers import customer_form
 
 
@@ -161,7 +161,24 @@ def _remove_line(draft, index):
         draft["_builder_version"] = draft.get("_builder_version", 0) + 1
 
 
-def _cart(draft, key, editable=False):
+def _reference_upload(store, target, key, label="Imagem de inspiração deste item"):
+    upload = st.file_uploader(label, ["jpg", "jpeg", "png", "webp"], key=key)
+    if upload:
+        signature = hashlib.sha256(upload.getvalue()).hexdigest()
+        if signature != target.get("_reference_hash"):
+            try:
+                target["reference_photo"] = store.save_image(upload)
+                target["_reference_hash"] = signature
+            except ValueError as exc:
+                st.error(str(exc))
+    if target.get("reference_photo"):
+        media_thumbnail(target["reference_photo"], store, 130, "Modelo de inspiração")
+        if st.checkbox("Desconsiderar esta imagem", key=key + "_remove"):
+            target["reference_photo"] = ""
+    return target.get("reference_photo", "")
+
+
+def _cart(draft, key, editable=False, store=None):
     if not draft["lines"]:
         empty_state("Seu orçamento está começando", "Escolha um produto, personalize e adicione ao pedido.", "▤")
         return
@@ -173,7 +190,15 @@ def _cart(draft, key, editable=False):
             a.caption(f"{quantity_text(line['quantity'])} {line['unit']} · " + " / ".join(line.get("fillings", []) + line.get("flavors", [])))
             b.markdown(f"**{brl(line['total_cents'])}**")
             for extra in line["extras"]:
-                st.caption(f"＋ {extra['name']} · " + ("Cortesia" if extra["gift"] or line["gift"] else brl(extra["amount_cents"])))
+                st.caption(f"＋ {extra.get('quantity', 1)} × {extra['name']} · " + ("[BRINDE]" if extra["gift"] or line["gift"] else brl(extra["amount_cents"])))
+                if extra.get("flavors"):
+                    st.caption(extra.get("brigadeiro_type", "") + " · " + " / ".join(extra["flavors"]) + " · " + extra.get("personalization", ""))
+            if line.get("composition"):
+                st.caption("Inclui: " + "; ".join(line["composition"]))
+            if line.get("negotiation", {}).get("notes"):
+                st.caption("Exceção autorizada: " + line["negotiation"]["notes"])
+            if store and line.get("reference_photo"):
+                media_thumbnail(line["reference_photo"], store, 120, "Referência do item")
             if line["details"]:
                 st.caption(line["details"])
             if editable:
@@ -208,47 +233,87 @@ def _products_step(store, draft, key):
         pkey = lambda name: bkey(f"{product_id}_{name}")
         price, promotional = active_price(product)
         st.markdown(f"**{brl(price)} / {product['unit']}**" + (" · Promoção vigente" if promotional else ""))
+        if product.get("photos"):
+            photo, description = st.columns([1, 3])
+            with photo:
+                media_thumbnail(product["photos"][0], store, 120)
+            description.write(product["description"])
+        else:
+            st.write(product["description"])
+        if product.get("composition"):
+            st.markdown("**Este kit inclui**")
+            for component in product["composition"]:
+                st.write("• " + component)
         is_cake = category in CATEGORIES[:2]
-        minimum = 2.0 if category == CATEGORIES[0] else .1 if is_cake else 1.0
+        minimum = 1.0
+        initial_quantity = 2.0 if is_cake else 1.0
         label = "Peso do bolo (kg)" if is_cake else "Quantidade de centos" if product["unit"] == "cento" else "Quantidade de unidades"
-        quantity = st.number_input(label, min_value=minimum, max_value=100000.0, step=.1 if is_cake else 1.0, format="%.2f" if is_cake else "%.0f", key=_seed(pkey("qty"), max(minimum, float(builder.get("quantity", minimum)))))
+        quantity = st.number_input(label, min_value=minimum, max_value=100000.0, step=.5 if is_cake else 1.0, format="%.2f" if is_cake else "%.0f", key=_seed(pkey("qty"), max(minimum, float(builder.get("quantity", initial_quantity)))))
         fillings, extras, flavors = [], [], []
         brigadeiro_type, split = None, False
+        allow_exception, negotiation_notes = False, ""
         if is_cake:
-            st.markdown("**Escolha os recheios**")
+            st.markdown(f"**Escolha até {filling_limit(quantity)} recheio(s)**")
+            st.caption("Mínimo padrão de 2 kg. Abaixo de 2 kg: um recheio. A partir de 2 kg: até dois recheios.")
             choices = SIMPLE_FILLINGS if category == CATEGORIES[0] else SPECIAL_FILLINGS
             columns = st.columns(2)
             for i, filling in enumerate(choices):
                 if columns[i % 2].checkbox(filling, key=_seed(pkey(filling), filling in builder.get("fillings", []))):
                     fillings.append(filling)
+            if quantity < 2 or len(fillings) > filling_limit(quantity):
+                st.warning("Este bolo foge do padrão de peso ou quantidade de recheios. Só continue se a confeiteira tiver combinado a exceção com o cliente.")
+                allow_exception = st.checkbox("Confirmar exceção combinada com a confeiteira", key=_seed(pkey("exception"), bool(builder.get("negotiation", {}).get("notes"))))
+                negotiation_notes = st.text_input("Motivo / condição da exceção", key=_seed(pkey("negotiation"), builder.get("negotiation", {}).get("notes", "")), placeholder="Registre o que foi combinado com o cliente")
             with st.expander("Decoração e adicionais", expanded=bool(builder.get("extras"))):
                 old = {e["name"]: e for e in builder.get("extras", [])}
                 selected_extras = st.multiselect("Adicionar ao bolo", EXTRAS, placeholder="Escolha os adicionais", key=_seed(pkey("extras"), list(old)))
                 for name in selected_extras:
                     st.markdown(f"**{name}**")
-                    a, b = st.columns([2, 1], vertical_alignment="bottom")
-                    with a:
-                        amount = _money("Valor do adicional (R$)", old.get(name, {}).get("amount_cents", 0), pkey(name + "amount"))
-                    free = b.checkbox("É cortesia", key=_seed(pkey(name + "gift"), old.get(name, {}).get("gift", False)))
-                    extras.append({"name": name, "amount_cents": amount, "gift": free})
+                    previous = old.get(name, {})
+                    a, b, c = st.columns([1, 1.5, 1], vertical_alignment="bottom")
+                    units = a.number_input("Quantidade do adicional", min_value=1, max_value=100000, step=1, key=_seed(pkey(name + "units"), int(previous.get("quantity", 1))))
+                    with b:
+                        amount = _money("Valor unitário (R$)", previous.get("unit_cents", previous.get("amount_cents", 0)), pkey(name + "amount"))
+                    free = c.checkbox("É cortesia", key=_seed(pkey(name + "gift"), previous.get("gift", False)))
+                    extra = {"name": name, "quantity": units, "unit_cents": amount, "amount_cents": units * amount, "gift": free}
+                    st.caption("[BRINDE]" if free else f"{units} unidade(s) × {brl(amount)} = {brl(units * amount)}")
+                    if name == "Brigadeiros no Topo":
+                        kind = st.selectbox("Tipo dos brigadeiros adicionais", BRIGADEIRO_TYPES, key=_seed(pkey(name+"type"), previous.get("brigadeiro_type", "Tradicional")))
+                        chosen = st.multiselect("Sabores dos brigadeiros adicionais", BRIGADEIRO_FLAVORS[kind], key=_seed(pkey(name+kind+"flavors"), [f for f in previous.get("flavors", []) if f in BRIGADEIRO_FLAVORS[kind]]), placeholder="Escolha os sabores")
+                        extra.update(brigadeiro_type=kind, flavors=chosen)
+                        if kind == "Personalizado":
+                            extra["personalization"] = st.text_input("Personalização dos brigadeiros adicionais", key=_seed(pkey(name+"personalization"), previous.get("personalization", "")))
+                    if "Topo de Bolo" in name:
+                        extra["reference_photo"] = _reference_upload(store, previous, pkey(name+"reference"), "Imagem de inspiração do topo")
+                        extra["_reference_hash"] = previous.get("_reference_hash", "")
+                    extras.append(extra)
                 if selected_extras:
-                    st.caption("Valor pelo item inteiro, sem multiplicar pelo peso do bolo.")
+                    st.caption("Cada adicional usa quantidade × valor unitário, independentemente do peso do bolo.")
         if category == CATEGORIES[2]:
-            brigadeiro_type = st.selectbox("Tipo de brigadeiro", BRIGADEIRO_TYPES, key=_seed(pkey("type"), builder.get("brigadeiro_type") or BRIGADEIRO_TYPES[0]))
+            default_type = "Personalizado" if "Personalizados" in product["name"] else "Especial" if "Especiais" in product["name"] else "Tradicional"
+            brigadeiro_type = st.selectbox("Tipo de brigadeiro", BRIGADEIRO_TYPES, key=_seed(pkey("type"), builder.get("brigadeiro_type") or default_type))
             split = st.checkbox("Dividir cento em 50/50", key=_seed(pkey("split"), builder.get("split", False)))
-            flavors = [st.text_input("Sabor 1", key=_seed(pkey("flavor_1"), (builder.get("flavors") or [""])[0]))]
+            options = BRIGADEIRO_FLAVORS[brigadeiro_type]
+            old_flavors = builder.get("flavors", [])
+            initial = old_flavors[0] if old_flavors and old_flavors[0] in options else options[0]
+            flavors = [st.selectbox("Sabor 1", options, key=_seed(pkey(brigadeiro_type+"flavor_1"), initial))]
             if split:
-                flavors.append(st.text_input("Sabor 2", key=_seed(pkey("flavor_2"), builder["flavors"][1] if len(builder.get("flavors", [])) > 1 else "")))
+                initial = old_flavors[1] if len(old_flavors)>1 and old_flavors[1] in options else options[1]
+                flavors.append(st.selectbox("Sabor 2", options, key=_seed(pkey(brigadeiro_type+"flavor_2"), initial)))
                 st.caption("50 unidades de cada sabor por cento.")
+            if brigadeiro_type == "Personalizado":
+                st.info("Preencha o tema, as cores e a decoração em Detalhes deste item. Você também pode anexar uma inspiração.")
         with st.expander("Personalização e cortesia", expanded=bool(builder.get("details") or builder.get("gift"))):
             details = st.text_area("Detalhes deste item", placeholder="Tema, tamanho, cores e personalização…", key=_seed(pkey("details"), builder.get("details", "")))
             gift = st.checkbox("Este item é um brinde / cortesia", key=_seed(pkey("gift"), builder.get("gift", False)))
+        reference = _reference_upload(store, builder, pkey("reference"))
         builder.update({"product_id": product_id, "category": category, "quantity": str(quantity), "fillings": fillings, "extras": extras,
                         "details": details, "gift": gift, "brigadeiro_type": brigadeiro_type, "split": split, "flavors": flavors})
         editing = draft.get("_line_edit")
         if st.button("Salvar alterações do item" if editing is not None else "Adicionar ao pedido", type="primary", icon=":material/add:", width="stretch", key=key("add")):
             try:
-                line = make_line(product, quantity, fillings, extras, details, gift, brigadeiro_type, split, flavors)
+                line = make_line(product, quantity, fillings, extras, details, gift, brigadeiro_type, split, flavors,
+                                 allow_extra_fillings=allow_exception, allow_under_minimum=allow_exception, negotiation_notes=negotiation_notes, reference_photo=reference)
                 if editing is None:
                     draft["lines"].append(line)
                 else:
@@ -262,7 +327,7 @@ def _products_step(store, draft, key):
             draft.pop("_builder", None)
             draft["_builder_version"] = version + 1
             st.rerun()
-    _cart(draft, key, editable=True)
+    _cart(draft, key, editable=True, store=store)
     a, b = st.columns(2)
     a.button("Voltar", icon=":material/arrow_back:", key=key("back_2"), width="stretch", on_click=_go_step, args=(store, draft, 0, key))
     b.button("Continuar para pagamento", type="primary", key=key("next_2"), disabled=not draft["lines"], width="stretch", on_click=_go_step, args=(store, draft, 2, key))
@@ -319,25 +384,32 @@ def _review_step(store, draft, key):
             detail("Pagamento", draft.get("payment_method", "PIX"))
             detail("Endereço", draft.get("delivery_address") if draft.get("fulfillment") == "Entrega" else "Retirada na loja")
         st.button("Alterar cliente ou entrega", key=key("edit_client"), on_click=_go_step, args=(store, draft, 0, key))
-    _cart(draft, key)
+    _cart(draft, key, store=store)
     with st.container(border=True, key="card_quote_5"):
         detail("Observações para o cliente", draft.get("notes"))
         detail("Orientações para a cozinha", draft.get("production_notes"))
         if draft.get("reference_photo") and store.image_path(draft["reference_photo"]):
             st.image(str(store.image_path(draft["reference_photo"])), width=160)
         st.caption("Validade de 7 dias. A data só é reservada após o recebimento do sinal mínimo de 50%.")
+    with st.expander("Logo da loja no orçamento", expanded=not store.settings().get("logo")):
+        logo_target = {"reference_photo": draft.get("logo_override") or draft.get("shop", {}).get("logo") or store.settings().get("logo", ""), "_reference_hash": draft.get("_logo_hash", "")}
+        draft["logo_override"] = _reference_upload(store, logo_target, key("logo"), "Adicionar / trocar logo deste orçamento")
+        draft["_logo_hash"] = logo_target.get("_reference_hash", "")
+        st.caption("A identidade padrão da loja pode ser cadastrada em Configurações.")
     a, b = st.columns([1, 2])
     a.button("Voltar", icon=":material/arrow_back:", key=key("back_4"), width="stretch", on_click=_go_step, args=(store, draft, 2, key))
-    if b.button("Salvar orçamento e abrir pedido", type="primary", icon=":material/check:", key=key("save"), width="stretch"):
+    if b.button("Salvar orçamento", type="primary", icon=":material/check:", key=key("save"), width="stretch"):
         try:
             _validate_customer(draft, store)
             payload = {field: draft.get(field, "") for field in ("customer_id", "event_at", "fulfillment", "delivery_address", "payment_method", "pix_enabled", "pix_percent", "discount_cents", "delivery_cents", "notes", "production_notes", "reference_photo")}
             if payload["fulfillment"] == "Retirada":
                 payload["delivery_address"] = ""
             payload["lines"] = deepcopy(draft["lines"])
+            payload["logo_override"] = draft.get("logo_override", "")
             quote_id = store.save_quote(payload, draft.get("id") or draft.get("quote_id"))
-            draft["quote_id"] = quote_id
-            st.session_state["quote_to_open"] = quote_id
+            st.session_state["draft"] = {"lines": []}
+            st.session_state["draft_version"] = st.session_state.get("draft_version", 0) + 1
+            st.session_state.pop("selected_quote", None)
             st.session_state["notice"] = f"Orçamento #{quote_id:04d} salvo. Agora você pode enviar o PDF ou registrar o sinal."
             st.session_state["_navigate"] = "Orçamentos e pagamentos"
             st.rerun()

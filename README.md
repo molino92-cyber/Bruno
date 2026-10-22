@@ -1,6 +1,6 @@
 # Doce Ateliê · Gestão de Confeitaria
 
-Sistema local em Python + Streamlit, com banco SQLite e fotos locais. A interface abre no navegador do próprio computador. Não depende de servidor remoto, Excel ou serviços pagos.
+Sistema local em Python + Streamlit, com banco SQLite e fotos locais. A interface abre no navegador do próprio computador. A edição Windows não depende de servidor remoto, Excel ou serviços pagos; o acesso compartilhado por celular requer hospedagem.
 
 ## Instalador Windows para clientes
 
@@ -8,7 +8,21 @@ O projeto inclui um inicializador com janela própria, empacotamento PyInstaller
 
 Consulte [como gerar e distribuir o instalador](packaging/README.md). O `.exe` precisa ser compilado e validado no Windows; há um workflow manual no GitHub Actions preparado para isso.
 
-## Interface renovada · versão 1.1
+## Atualização 1.2 · Windows, Android e iOS
+
+A versão Windows preserva o funcionamento local. A nova versão para celular é um **PWA com login por senha**, instalável pela URL HTTPS no Android e no iPhone. Para compartilhar pedidos entre aparelhos, hospede o sistema e use a mesma URL. O banco do instalador local não é sincronizado automaticamente com o servidor. Veja [instalação no celular e hospedagem](deploy/README.md).
+
+- Lista de clientes compacta, com foto pequena, pesquisa, paginação de 12/24/48 registros e ações Abrir, Editar e Excluir/Arquivar.
+- CEP consultado ao sair do campo ou clicar em Buscar: preenche rua, bairro, cidade e UF. Número e complemento são conferidos manualmente. A consulta depende de internet; se falhar, os campos continuam editáveis.
+- Fotos da vitrine em quadros de **170 px de altura**, com proporção preservada, tanto para fotos grandes quanto pequenas.
+- **Ver demonstração** oferece exemplos com ilustrações, descrições, seis clientes e pedidos fictícios em banco separado. Seus dados reais não recebem preços fictícios.
+- Bolos Simples e Especiais: mínimo padrão de **2 kg**, até um recheio abaixo de 2 kg e até dois a partir de 2 kg. Exceção de peso ou recheios exige confirmação e justificativa, guardada no pedido e na ficha da cozinha.
+- Adicionais com quantidade × preço unitário; sabores tradicionais, especiais e personalizados para brigadeiros do cento e do topo.
+- Kits Festa **1 a 4**, com composição visível e editável. Kit 1: um bolo simples de 2 kg, dez brigadeiros tradicionais e cinco cupcakes. Demais composições são exemplos para revisão pela loja.
+- Imagens de inspiração por item e topo, incluídas na ficha da cozinha. Logo pode ser enviada na revisão e nos detalhes do pedido.
+- Pedidos abertos/fechados listados sem abrir automaticamente os detalhes. **Ver pedido** abre os dados, os recebimentos e os PDFs.
+
+## Interface e cadastros
 
 Navegação lateral, cartões com fotos, pesquisa de clientes, ações de cadastro visíveis e controles de calendário e upload em português. As telas se adaptam a janelas menores.
 
@@ -22,7 +36,7 @@ As imagens em `docs/imagens/` usam dados fictícios para mostrar as telas.
 
 ## Executar
 
-Instale **Python 3.10+** (recomendado: 3.12). No terminal, dentro desta pasta:
+Instale **Python 3.12+** (recomendado: 3.12). No terminal, dentro desta pasta:
 
 ```bash
 python iniciar.py
@@ -52,7 +66,7 @@ python -m venv .venv
 2. Em **Catálogo**, revise os produtos iniciais. Bolo Simples começa em **R$ 75/kg** e Bolo Especial em **R$ 85/kg**. Os outros produtos começam **sem preço**, para você definir seus valores reais. Preço zero só permite adicionar como cortesia. Cadastre variantes separadas para brigadeiros Tradicionais, Especiais ou Personalizados com preços diferentes.
 3. Em **Clientes → Novo cliente**, preencha contato e endereço nos campos separados. Nome e WhatsApp são obrigatórios; CPF e os demais campos são opcionais. CPF, CEP e e-mail preenchidos são validados.
 4. Cadastre insumos em **Insumos e estoque**. O valor pago é **por embalagem**; o custo unitário é esse valor dividido pelo conteúdo em g, ml ou unidade. Ex.: R$ 5,00 por 1.000 ml = R$ 0,0050/ml. Quantidade em estoque corresponde ao número de embalagens da unidade indicada.
-5. Em **Novo orçamento**, selecione o cliente (ou cadastre um novo ali mesmo), informe data e entrega, adicione os produtos, defina o pagamento e revise. Finalize com **Salvar orçamento e abrir pedido**.
+5. Em **Novo orçamento**, selecione o cliente (ou cadastre um novo ali mesmo), informe data e entrega, adicione os produtos, defina o pagamento e revise. Finalize com **Salvar orçamento** e abra os detalhes em **Ver pedido**.
 6. Em **Pedidos e pagamentos**, abra o pedido, baixe os PDFs e registre apenas os pagamentos efetivamente recebidos.
 7. Em **Agenda de produção**, clique no dia para visualizar os pedidos reservados em ordem de horário e baixar as fichas da cozinha.
 
@@ -60,8 +74,8 @@ python -m venv .venv
 
 - Galeria local de **até 3 fotos por produto**, descrição e sete categorias. JPG, PNG e WEBP, até 10 MB por foto; as imagens são normalizadas em PNG, com resolução máxima de 1.800 × 1.800 e nomes aleatórios. Metadados EXIF são removidos.
 - Promoção com preço e intervalo inclusivo de início/fim. O preço vigente é registrado ao adicionar o item ao orçamento; pedidos salvos preservam esse preço mesmo após editar o catálogo.
-- Bolo Simples: **mínimo de 2 kg** e apenas Chocolate, Ninho, Chocolate Branco ou Dois Amores. Bolo Especial: apenas a lista de recheios especiais. Como não foi definido mínimo para o especial, a interface permite a partir de 0,1 kg.
-- Adicionais de massa, brigadeiros, frutas, recheios extras, andar e topo têm **preço manual pelo item inteiro**, sem multiplicação por kg. Qualquer item ou adicional pode ser **[BRINDE]**, com cobrança zero. Outros produtos são cobrados por unidade; brigadeiros por cento inteiro.
+- Bolos Simples e Especiais: **mínimo padrão de 2 kg**, com até dois recheios. Abaixo de 2 kg, apenas um recheio. Peso menor ou recheios além do padrão exigem autorização expressa com motivo. O Simples oferece Chocolate, Ninho, Chocolate Branco ou Dois Amores; o Especial oferece apenas os recheios especiais.
+- Adicionais de massa, brigadeiros, frutas, recheios extras, andar e topo têm **quantidade × preço unitário manual**, sem multiplicação por kg. Qualquer item ou adicional pode ser **[BRINDE]**, com cobrança zero. Outros produtos são cobrados por unidade; brigadeiros por cento inteiro.
 - Brigadeiros: categoria Tradicional/Especial/Personalizado; cento inteiro ou **50 de cada sabor por cento**. A categoria descreve a produção; o preço vem do produto/variante cadastrado.
 - PIX/Dinheiro **desativado por padrão**. Para aplicar, marque a opção e informe o percentual. Há aviso quando o pedido inclui promoção; acumular é uma decisão explícita do usuário. Cartão não permite o desconto PIX.
 - Cálculo: `subtotal − desconto geral + frete = preço cartão`. O desconto PIX incide sobre `subtotal − desconto geral`, **sem descontar o frete**. O desconto geral não pode superar o subtotal. Valores monetários são armazenados em centavos; multiplicações e percentuais usam `Decimal` com arredondamento comercial.
@@ -93,7 +107,7 @@ Em **Configurações → Preparar cópia de segurança**, baixe o ZIP com snapsh
 
 Para separar dados do código, defina `CONFEITARIA_DATA_DIR` e `CONFEITARIA_MEDIA_DIR` com diretórios locais de sua escolha. Na restauração, use esses diretórios correspondentes. Não use diretórios compartilhados por rede para o banco SQLite.
 
-Os dados incluem CPF, endereço e foto. O aplicativo não oferece login nem criptografia própria: destina-se a **uso local por pessoas autorizadas**, mantendo o servidor em `127.0.0.1`. Proteja o computador e os backups. Não exponha a porta à internet. Não são necessárias chaves de API nem credenciais.
+Os dados incluem CPF, endereço e foto. A **edição Windows local** usa o acesso do próprio computador, sem login adicional nem criptografia do banco, mantendo o servidor em `127.0.0.1`. Proteja o computador e os backups. Não exponha essa porta à internet. A **edição móvel hospedada** adiciona login por senha e gateway HTTPS; as instruções estão em [deploy/README.md](deploy/README.md).
 
 ## Validação e desenvolvimento
 

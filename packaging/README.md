@@ -4,7 +4,7 @@ O empacotamento produz um **instalador Windows x64** e uma versão portátil. Py
 
 ## Experiência do cliente
 
-1. Executar `DoceAtelie-Instalador-1.1.0-Windows-x64.exe`.
+1. Executar `DoceAtelie-Instalador-1.2.0-Windows-x64.exe`.
 2. Seguir o instalador em português. A instalação é por usuário, sem exigir administrador.
 3. Abrir **Doce Ateliê** pelo menu Iniciar ou pelo atalho da área de trabalho.
 4. O navegador abre automaticamente quando o sistema está pronto. Manter a pequena janela Doce Ateliê aberta durante o uso.
@@ -35,7 +35,7 @@ Abra PowerShell na raiz do projeto:
 ```powershell
 .\packaging\build-windows.ps1
 # Outra versão de atualização, se necessário:
-.\packaging\build-windows.ps1 -Version 1.1.1
+.\packaging\build-windows.ps1 -Version 1.2.1
 ```
 
 Se a política local bloquear scripts, ela precisa permitir esse script revisado conforme as regras do computador. Não é necessário mudar a política global.
@@ -44,7 +44,7 @@ O script cria `.venv-build`, instala dependências, executa os testes, empacota 
 
 ```text
 dist\DoceAtelie\DoceAtelie.exe
-dist\instalador\DoceAtelie-Instalador-1.1.0-Windows-x64.exe
+dist\instalador\DoceAtelie-Instalador-1.2.0-Windows-x64.exe
 ```
 
 O teste do binário verifica SQLite, mídia, orçamento/sinal, os dois PDFs, backup, resposta HTTP, renderização da interface por WebSocket e encerramento do servidor. Todo teste usa perfil temporário e não altera dados reais.
@@ -60,10 +60,14 @@ O arquivo `.github/workflows/windows-installer.yml` inclui um fluxo manual de co
 
 O workflow não publica releases nem distribui o programa automaticamente. Consome a disponibilidade/cota de GitHub Actions do repositório. Preserve o mesmo AppId do instalador nas atualizações para manter a identidade do aplicativo.
 
-Na branch `codex/doce-atelie`, o envio de alterações também inicia a geração automaticamente. Execuções anteriores dessa branch são canceladas quando uma nova compilação começa. A versão 1.1 mantém o AppId da versão 1.0 e migra os cadastros existentes automaticamente, com cópia do banco antes da migração. Feche o aplicativo antes de instalar a atualização.
+Na branch `codex/doce-atelie`, o envio de alterações também inicia a geração automaticamente. Execuções anteriores dessa branch são canceladas quando uma nova compilação começa. A versão 1.2 mantém o AppId da versão 1.0 e migra os cadastros existentes automaticamente, com cópia do banco antes da migração. Feche o aplicativo antes de instalar a atualização.
 
 ## Validação antes de distribuir
 
 A compilação e os testes de pacote em Linux não validam o `.exe` do Windows. Antes da entrega, execute o workflow Windows e teste a instalação em um computador/VM Windows limpo, sem Python: abrir pelo atalho, cadastrar cliente, salvar orçamento, baixar PDFs, encerrar/reabrir e atualizar preservando dados. O desinstalador preserva intencionalmente os dados pessoais; a remoção deles é manual.
 
 O projeto não inclui certificado de assinatura de código. O Windows pode identificar o instalador como de editor desconhecido. Para distribuição comercial, use o certificado de assinatura da empresa no `.exe` e no instalador. Não é necessário nem recomendado desativar o antivírus.
+
+## Android e iOS
+
+O mesmo workflow gera **DoceAtelie-Android-iOS-PWA**, com código, imagens e configuração de hospedagem HTTPS. É um pacote para o servidor, não um instalador APK/IPA. Depois da hospedagem, o cliente instala pela URL no Chrome (Android) ou Safari (iPhone). Veja [as instruções completas](../deploy/README.md).

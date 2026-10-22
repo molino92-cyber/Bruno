@@ -19,6 +19,8 @@ class InterfaceTests(unittest.TestCase):
         root = Path(self.temp.name)
         self.env = patch.dict(os.environ, {"CONFEITARIA_DATA_DIR": str(root / "dados"), "CONFEITARIA_MEDIA_DIR": str(root / "midia")})
         self.env.start()
+        self.postal = patch("confeitaria.postal.lookup_postal_code", side_effect=ValueError("Consulta indisponível. Preencha manualmente."))
+        self.postal.start()
         st.cache_resource.clear()
         self.store = Store()
         self.app = AppTest.from_file(str(Path(__file__).resolve().parent.parent / "app.py"), default_timeout=15).run()
@@ -27,6 +29,7 @@ class InterfaceTests(unittest.TestCase):
     def tearDown(self):
         st.cache_resource.clear()
         self.env.stop()
+        self.postal.stop()
         self.temp.cleanup()
 
     def assert_clean(self):
@@ -138,9 +141,85 @@ class InterfaceTests(unittest.TestCase):
             self.assertIn(allowed, labels)
             self.assertNotIn(forbidden, labels)
         self.widget("radio", "Categoria").set_value("Cento de Brigadeiros").run()
+        self.widget("selectbox", "Tipo de brigadeiro").select("Tradicional").run()
         self.widget("checkbox", "Dividir cento em 50/50").check().run()
         self.assert_clean()
-        self.assertIsNotNone(self.widget("text_input", "Sabor 2"))
+        self.assertEqual(self.widget("selectbox", "Sabor 2").options, ["Chocolate", "Beijinho"])
+
+    def test_both_cakes_require_explicit_weight_and_filling_exceptions(self):
+        self.start_quote()
+        for category, flavors in [("Bolos Simples", ["Chocolate", "Ninho"]), ("Bolos Especiais", ["Nutella", "Ninho com Morango"])]:
+            self.widget("radio", "Categoria").set_value(category).run()
+            self.widget("number_input", "Peso do bolo (kg)").set_value(1.5).run()
+            for flavor in flavors:
+                self.widget("checkbox", flavor).check()
+            self.click("Adicionar ao pedido")
+            self.assertTrue(self.app.warning)
+            self.assertTrue(self.app.error)
+            before = len(self.app.session_state["draft"]["lines"])
+            self.widget("checkbox", "Confirmar exceção combinada com a confeiteira").check()
+            self.widget("text_input", "Motivo / condição da exceção").input("Combinado por telefone com a confeiteira.")
+            self.click("Adicionar ao pedido")
+            self.assertFalse(self.app.error)
+            lines = self.app.session_state["draft"]["lines"]
+            self.assertEqual(len(lines), before+1)
+            self.assertTrue(lines[-1]["negotiation"]["under_minimum"])
+            self.assertTrue(lines[-1]["negotiation"]["extra_fillings"])
+
+    def test_postal_lookup_fills_address_preserving_house_and_complement(self):
+        self.page("Clientes")
+        self.click("Novo cliente")
+        self.widget("text_input", "Número").input("18")
+        self.widget("text_input", "Complemento").input("Casa B").run()
+        result = {"postal_code":"01001000", "street":"Praça da Sé", "neighborhood":"Sé", "city":"São Paulo", "state":"SP"}
+        with patch("confeitaria.postal.lookup_postal_code", return_value=result):
+            self.widget("text_input", "CEP").input("01001-000").run()
+        self.assertEqual(self.widget("text_input", "Rua / avenida").value, "Praça da Sé")
+        self.assertEqual(self.widget("text_input", "Cidade").value, "São Paulo")
+        self.assertEqual(self.widget("selectbox", "Estado (UF)").value, "SP")
+        self.assertEqual(self.widget("text_input", "Número").value, "18")
+        self.assertEqual(self.widget("text_input", "Complemento").value, "Casa B")
+        self.widget("text_input", "CEP").input("99999-999").run()
+        self.assertEqual(self.widget("text_input", "Rua / avenida").value, "Praça da Sé")
+
+    def test_kit_composition_and_brigadeiro_extras(self):
+        self.start_quote()
+        self.widget("radio", "Categoria").set_value("Kits Festa").run()
+        self.assertEqual(len(self.widget("selectbox", "Produto").options), 4)
+        self.assertIn("10 brigadeiros tradicionais", " ".join(w.value for w in self.app.markdown))
+        self.widget("radio", "Categoria").set_value("Bolos Simples").run()
+        self.widget("checkbox", "Ninho").check()
+        self.widget("multiselect", "Adicionar ao bolo").select("Brigadeiros no Topo").run()
+        self.assertEqual(self.widget("multiselect", "Sabores dos brigadeiros adicionais").options, ["Chocolate", "Beijinho"])
+        self.widget("multiselect", "Sabores dos brigadeiros adicionais").select("Chocolate")
+        self.widget("number_input", "Quantidade do adicional").set_value(10)
+        self.widget("number_input", "Valor unitário (R$)").set_value(3.0)
+        self.click("Adicionar ao pedido")
+        self.assertEqual(self.app.session_state["draft"]["lines"][-1]["total_cents"], 18000)
+
+    def test_orders_list_starts_closed_and_filters_delivered(self):
+        client = self.client()
+        identifier = self.create_order(client)
+        self.page("Orçamentos e pagamentos")
+        self.assertEqual(len(self.app.get("download_button")), 0)
+        self.widget("radio", "Situação dos pedidos").set_value("Fechados").run()
+        self.assertFalse(any(w.key == f"open_order_{identifier}" for w in self.app.button))
+        self.widget("radio", "Situação dos pedidos").set_value("Abertos").run()
+        self.click_key(f"open_order_{identifier}")
+        self.assertEqual(len(self.app.get("download_button")), 2)
+        self.click("Voltar para pedidos")
+        self.assertEqual(len(self.app.get("download_button")), 0)
+
+    def test_demo_toggle_keeps_real_data_separate(self):
+        self.client()
+        self.widget("toggle", "Ver demonstração").set_value(True).run()
+        self.assert_clean()
+        self.page("Clientes")
+        self.assertEqual(self.app.metric[0].value, "6")
+        self.widget("toggle", "Ver demonstração").set_value(False).run()
+        self.assert_clean()
+        self.page("Clientes")
+        self.assertEqual(self.app.metric[0].value, "1")
 
     def test_cart_item_edit_and_step_persistence(self):
         self.start_quote()
@@ -170,7 +249,7 @@ class InterfaceTests(unittest.TestCase):
         self.click("Continuar para produtos")
         self.widget("checkbox", "Ninho").check().run()
         self.widget("multiselect", "Adicionar ao bolo").select("Topo de Bolo Simples").run()
-        self.widget("number_input", "Valor do adicional (R$)").set_value(25.0)
+        self.widget("number_input", "Valor unitário (R$)").set_value(25.0)
         self.widget("checkbox", "É cortesia").check().run()
         self.click("Adicionar ao pedido")
         self.click("Continuar para pagamento")
@@ -180,12 +259,14 @@ class InterfaceTests(unittest.TestCase):
         self.widget("number_input", "Entrega / frete (R$)").set_value(20.0)
         self.widget("text_area", "Orientações para a cozinha").input("Sem castanhas. Tema jardim.")
         self.click("Revisar orçamento")
-        self.click("Salvar orçamento e abrir pedido")
+        self.click("Salvar orçamento")
         q = self.store.quotes()[0]
         self.assertEqual(q["totals"]["total_cents"], 14600)
         self.assertTrue(q["lines"][0]["extras"][0]["gift"])
         self.assertIn("Rua A, 42", q["delivery_address"])
         self.assertEqual(self.app.sidebar.radio[0].value, "Orçamentos e pagamentos")
+        self.assertEqual(len(self.app.get("download_button")), 0)
+        self.click_key(f"open_order_{q['id']}")
         self.assertEqual(len(self.app.get("download_button")), 2)
         self.widget("checkbox", "Confirmo que este valor já foi recebido").check()
         self.click("Registrar recebimento")

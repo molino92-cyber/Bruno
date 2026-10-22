@@ -1,0 +1,38 @@
+services:
+  sistema:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    environment:
+      DOCE_MOBILE_PASSWORD: ${DOCE_MOBILE_PASSWORD:?Defina uma senha com pelo menos 12 caracteres}
+      DOCE_PUBLIC_URL: https://${DOCE_DOMAIN:?Defina o domínio da confeitaria}
+      TZ: America/Manaus
+    volumes:
+      - confeitaria:/data
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; assert urlopen('http://127.0.0.1:8080/saude',timeout=3).read()==b'ok'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+  https:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOCE_DOMAIN: ${DOCE_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - certificados:/data
+      - caddy_config:/config
+    depends_on:
+      - sistema
+volumes:
+  confeitaria:
+  certificados:
+  caddy_config:

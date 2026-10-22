@@ -9,3 +9,5 @@ midia/
 .venv-build/
 build/
 dist/
+.env
+deploy/.env

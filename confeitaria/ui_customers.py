@@ -23,7 +23,18 @@ def start_customer_quote(customer_id):
 
 def customer_form(store, customer=None, prefix="customer", on_saved=None):
     customer = customer or {}
-    with st.form(prefix + "_form", border=False):
+    def query_postal():
+        from .postal import lookup_postal_code
+        try:
+            result = lookup_postal_code(st.session_state.get(prefix + "cep", ""))
+            for source, target in [("street", "street"), ("neighborhood", "neighborhood"), ("city", "city"), ("state", "state")]:
+                st.session_state[prefix + target] = result[source]
+            st.session_state[prefix + "postal_message"] = "Endereço localizado. Confira o número e o complemento."
+            st.session_state.pop(prefix + "postal_error", None)
+        except ValueError as exc:
+            st.session_state[prefix + "postal_error"] = str(exc)
+            st.session_state.pop(prefix + "postal_message", None)
+    with st.container():
         st.markdown('<div class="section-title">Dados pessoais</div>', unsafe_allow_html=True)
         a, b = st.columns([2, 1])
         name = a.text_input("Nome completo *", customer.get("name", ""), max_chars=150, placeholder="Nome e sobrenome", key=prefix + "name")
@@ -34,17 +45,24 @@ def customer_form(store, customer=None, prefix="customer", on_saved=None):
         secondary = b.text_input("Telefone adicional", customer.get("phone_secondary", ""), max_chars=22, placeholder="Opcional", key=prefix + "secondary")
         email = st.text_input("E-mail", customer.get("email", ""), max_chars=254, placeholder="cliente@exemplo.com", key=prefix + "email")
         st.markdown('<div class="section-title">Endereço de entrega</div>', unsafe_allow_html=True)
-        a, b, c = st.columns([1, 2, 1])
+        a, action, b, c = st.columns([1.3, .7, 2, 1], vertical_alignment="bottom")
         cep = customer.get("postal_code", "")
-        postal_code = a.text_input("CEP", cep[:5] + "-" + cep[5:] if len(cep) == 8 else cep, max_chars=9, placeholder="69000-000", key=prefix + "cep")
-        city = b.text_input("Cidade", customer.get("city", ""), max_chars=100, placeholder="Manaus", key=prefix + "city")
+        postal_code = a.text_input("CEP", cep[:5] + "-" + cep[5:] if len(cep) == 8 else cep, max_chars=9, placeholder="69000-000", key=prefix + "cep", on_change=query_postal)
+        action.button("Buscar", key=prefix + "query_postal", on_click=query_postal, help="Buscar endereço pelo CEP", width="stretch")
+        for field in ("city", "state", "street", "neighborhood"):
+            st.session_state.setdefault(prefix + field, customer.get(field, ""))
+        city = b.text_input("Cidade", max_chars=100, placeholder="Manaus", key=prefix + "city")
         state_options = [""] + STATES
-        state = c.selectbox("Estado (UF)", state_options, index=state_options.index(customer.get("state", "")), format_func=lambda value: value or "UF", key=prefix + "state")
+        state = c.selectbox("Estado (UF)", state_options, format_func=lambda value: value or "UF", key=prefix + "state")
+        if st.session_state.get(prefix + "postal_error"):
+            st.caption(st.session_state[prefix + "postal_error"])
+        elif st.session_state.get(prefix + "postal_message"):
+            st.caption(st.session_state[prefix + "postal_message"])
         a, b = st.columns([3, 1])
-        street = a.text_input("Rua / avenida", customer.get("street", ""), max_chars=180, placeholder="Nome do logradouro", key=prefix + "street")
+        street = a.text_input("Rua / avenida", max_chars=180, placeholder="Nome do logradouro", key=prefix + "street")
         number = b.text_input("Número", customer.get("number", ""), max_chars=20, placeholder="Ex.: 125 ou S/N", key=prefix + "number")
         a, b = st.columns(2)
-        neighborhood = a.text_input("Bairro", customer.get("neighborhood", ""), max_chars=100, key=prefix + "neighborhood")
+        neighborhood = a.text_input("Bairro", max_chars=100, key=prefix + "neighborhood")
         complement = b.text_input("Complemento", customer.get("complement", ""), max_chars=150, placeholder="Apartamento, bloco, casa…", key=prefix + "complement")
         reference = st.text_input("Ponto de referência", customer.get("address_reference", ""), max_chars=200, key=prefix + "reference")
         legacy = customer.get("address", "")
@@ -79,7 +97,7 @@ def customer_form(store, customer=None, prefix="customer", on_saved=None):
                     on_saved(saved_id)
             except ValueError as exc:
                 st.session_state[prefix + "error"] = str(exc)
-        st.form_submit_button("Salvar cliente", type="primary", icon=":material/check:", width="stretch", on_click=submit)
+        st.button("Salvar cliente", type="primary", icon=":material/check:", width="stretch", on_click=submit, key=prefix + "save")
         if st.session_state.get(prefix + "error"):
             st.error(st.session_state[prefix + "error"])
     return None
@@ -151,12 +169,13 @@ def customers_page(store):
     with top:
         heading("ATENDIMENTO", "Clientes", "Pessoas, contatos e histórias que fazem parte da sua confeitaria.")
     action.button("Novo cliente", type="primary", icon=":material/person_add:", on_click=change_customer_view, args=("new",), width="stretch")
-    a, b, c = st.columns(3)
     all_quotes = store.quotes()
     active = [client for client in clients if client["active"]]
-    a.metric("Clientes ativos", len(active))
-    b.metric("Com pedidos", len({q["customer_id"] for q in all_quotes}))
-    c.metric("Cadastros completos", sum(all(c[field] for field in ("email", "street", "number", "neighborhood", "city", "state", "postal_code")) for c in active))
+    with st.container(key="metrics_customers"):
+        a, b, c = st.columns(3)
+        a.metric("Clientes ativos", len(active))
+        b.metric("Com pedidos", len({q["customer_id"] for q in all_quotes}))
+        c.metric("Cadastros completos", sum(all(c[field] for field in ("email", "street", "number", "neighborhood", "city", "state", "postal_code")) for c in active))
     st.write("")
     a, b = st.columns([3, 1])
     search = a.text_input("Buscar cliente", placeholder="Nome, telefone, e-mail ou CPF", label_visibility="collapsed")
@@ -187,24 +206,40 @@ def customers_page(store):
     st.caption(f"{len(visible)} cliente(s) encontrado(s)")
     if not visible:
         empty_state("Seus clientes, bem cuidados", "Cadastre um cliente ou ajuste a busca para começar.", "♡")
-    columns = st.columns(2, gap="medium")
-    for i, customer in enumerate(visible):
-        cid = customer["id"]
-        history = [q for q in all_quotes if q["customer_id"] == cid]
-        with columns[i % 2], st.container(border=True, key=f"card_customer_{cid}"):
-            profile_heading(customer, store, "Cliente ativo" if customer["active"] else "Arquivado")
-            location = " / ".join(filter(None, [customer["city"], customer["state"]])) or "Endereço a completar"
-            contacts = contact_line("phone", phone_text(customer["phone"])) + contact_line("mail", customer["email"] or "E-mail não informado") + contact_line("place", location)
-            st.markdown(f'<div class="contact-details">{contacts}</div>', unsafe_allow_html=True)
-            a, b, c = st.columns([1.4, 1, 1])
-            a.button("Ver cadastro", key=f"view_customer_{cid}", on_click=change_customer_view, args=("view", cid), width="stretch")
-            b.button("Editar", icon=":material/edit:", key=f"edit_customer_{cid}", on_click=change_customer_view, args=("edit", cid), width="stretch")
-            if customer["active"]:
-                def remove(customer_id=cid):
-                    st.session_state["customer_delete_id"] = customer_id
-                c.button("Arquivar" if history else "Excluir", key=f"delete_customer_{cid}", on_click=remove, width="stretch")
-            elif c.button("Restaurar", key=f"restore_customer_{cid}", width="stretch"):
-                store.restore_customer(cid)
-                st.session_state["notice"] = "Cliente restaurado."
-                st.rerun()
-            st.markdown(f'<div class="contact-footer">{len(history)} pedido(s) no histórico</div>', unsafe_allow_html=True)
+    size = st.selectbox("Clientes por página", [12, 24, 48], key="customer_page_size")
+    total_pages = max(1, (len(visible) + size - 1) // size)
+    current_page = min(st.session_state.get("customer_list_page", 1), total_pages)
+    page_rows = visible[(current_page - 1) * size:current_page * size]
+    with st.container(key="customer_sheet"):
+        headers = st.columns([2.8, 1.6, 2.1, 1.4, 1, 1, 1])
+        for col, label in zip(headers, ["Cliente", "Telefone", "E-mail", "Cidade / UF", "Cadastro", "Editar", "Ação"]):
+            col.caption(label.upper())
+        for customer in page_rows:
+            cid = customer["id"]
+            history = [q for q in all_quotes if q["customer_id"] == cid]
+            with st.container(key=f"customer_row_{cid}"):
+                name_col, phone_col, email_col, location_col, a, b, c = st.columns([2.8, 1.6, 2.1, 1.4, 1, 1, 1], vertical_alignment="center")
+                with name_col:
+                    profile_heading(customer, store, f"{len(history)} pedido(s)" + (" · Arquivado" if not customer["active"] else ""))
+                location = " / ".join(filter(None, [customer["city"], customer["state"]])) or "Endereço a completar"
+                phone_col.write(phone_text(customer["phone"]))
+                email_col.write(customer["email"] or "—")
+                location_col.write(location)
+                a.button("Abrir", key=f"view_customer_{cid}", on_click=change_customer_view, args=("view", cid), width="stretch")
+                b.button("Editar", icon=":material/edit:", key=f"edit_customer_{cid}", on_click=change_customer_view, args=("edit", cid), width="stretch")
+                if customer["active"]:
+                    def remove(customer_id=cid):
+                        st.session_state["customer_delete_id"] = customer_id
+                    c.button("Arquivar" if history else "Excluir", key=f"delete_customer_{cid}", on_click=remove, width="stretch")
+                elif c.button("Restaurar", key=f"restore_customer_{cid}", width="stretch"):
+                    store.restore_customer(cid)
+                    st.session_state["notice"] = "Cliente restaurado."
+                    st.rerun()
+    a, b, c = st.columns([1, 3, 1])
+    if a.button("Anterior", disabled=current_page <= 1, key="customer_previous"):
+        st.session_state["customer_list_page"] = current_page - 1
+        st.rerun()
+    b.caption(f"Página {current_page} de {total_pages} · {len(visible)} cliente(s)")
+    if c.button("Próxima", disabled=current_page >= total_pages, key="customer_next"):
+        st.session_state["customer_list_page"] = current_page + 1
+        st.rerun()

@@ -1,0 +1,4 @@
+{$DOCE_DOMAIN} {
+    encode gzip
+    reverse_proxy sistema:8080
+}

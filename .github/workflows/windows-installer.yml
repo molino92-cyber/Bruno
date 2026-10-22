@@ -10,6 +10,25 @@ concurrency:
   group: instalador-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  mobile:
+    name: Validar servidor Android e iOS
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gerar imagem do servidor
+        run: docker build -f deploy/Dockerfile -t doce-mobile:teste .
+      - name: Iniciar servidor e validar acesso real
+        env:
+          DOCE_MOBILE_PASSWORD: senha-apenas-ci-2026
+        run: |
+          docker run -d --name doce-mobile -p 127.0.0.1:8080:8080 -e DOCE_MOBILE_PASSWORD -e DOCE_PUBLIC_URL=http://localhost:8080 doce-mobile:teste
+          python packaging/smoke_mobile.py http://localhost:8080
+      - name: Encerrar teste e mostrar diagnóstico
+        if: always()
+        run: |
+          docker logs doce-mobile || true
+          docker rm -f doce-mobile || true
   build:
     runs-on: windows-2022
     timeout-minutes: 30
@@ -55,4 +74,12 @@ jobs:
         with:
           name: DoceAtelie-Portatil-Windows-x64
           path: dist/DoceAtelie/
+          if-no-files-found: error
+      - name: Preparar versão Android e iOS para hospedagem
+        run: python packaging/package-mobile.py
+      - name: Disponibilizar versão Android e iOS
+        uses: actions/upload-artifact@v4
+        with:
+          name: DoceAtelie-Android-iOS-PWA
+          path: dist/DoceAtelie-Android-iOS-*.zip
           if-no-files-found: error

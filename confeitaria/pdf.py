@@ -67,13 +67,21 @@ def generate_pdf(quote, store, kitchen=False):
             pieces.append("Preço promocional aplicado")
         if line.get("fillings"):
             pieces.append("Recheios: " + ", ".join(line["fillings"]))
+        if line.get("composition"):
+            pieces.append("Composição por kit: " + "; ".join(line["composition"]))
+        if line.get("negotiation", {}).get("notes"):
+            pieces.append("Exceção autorizada pela confeiteira: " + line["negotiation"]["notes"])
         if line.get("brigadeiro_type"):
             pieces.append("Brigadeiros: " + line["brigadeiro_type"])
             pieces.append(("50/50 (50 de cada sabor por cento): " if line.get("split") else "Sabor: ") + " / ".join(line.get("flavors", [])))
         for extra in line.get("extras", []):
-            label = f"Adicional: {extra['name']}"
+            label = f"Adicional: {extra.get('quantity', 1)} × {extra['name']}"
             label += " [BRINDE]" if extra["gift"] or line["gift"] else "" if kitchen else f" — {brl(extra['amount_cents'])}"
             pieces.append(label)
+            if extra.get("flavors"):
+                pieces.append(extra.get("brigadeiro_type", "") + ": " + " / ".join(extra["flavors"]))
+            if extra.get("personalization"):
+                pieces.append("Personalização: " + extra["personalization"])
         if line.get("details"):
             pieces.append("Detalhes: " + line["details"])
         return "\n".join(pieces)
@@ -81,6 +89,11 @@ def generate_pdf(quote, store, kitchen=False):
     if kitchen:
         for line in quote["lines"]:
             story += [p(f"{quantity_text(line['quantity'])} {line['unit']} · {line['name']}", "Heading3"), p(line_description(line)), Spacer(1, 10)]
+            if line.get("reference_photo"):
+                story += [p("Inspiração deste item", "SmallLocal"), photo(line["reference_photo"]), Spacer(1, 10)]
+            for extra in line.get("extras", []):
+                if extra.get("reference_photo"):
+                    story += [p("Inspiração: " + extra["name"], "SmallLocal"), photo(extra["reference_photo"]), Spacer(1, 10)]
         story += [p("DECORAÇÃO E ALERGIAS", "Heading2"), p(quote.get("production_notes") or "Nenhuma observação registrada."),
                   p("CONFERÊNCIA", "Heading3"), p("Produzido por: ____________________    Conferido por: ____________________"),
                   p("Embalagem, transporte e restrições: confira as observações de produção antes da saída.")]

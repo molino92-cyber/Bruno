@@ -50,7 +50,7 @@ class Store:
                     price_cents INTEGER NOT NULL CHECK(price_cents >= 0),
                     promo_enabled INTEGER NOT NULL DEFAULT 0, promo_cents INTEGER NOT NULL DEFAULT 0,
                     promo_start TEXT, promo_end TEXT, photos TEXT NOT NULL DEFAULT '[]',
-                    active INTEGER NOT NULL DEFAULT 1);
+                    active INTEGER NOT NULL DEFAULT 1, composition TEXT NOT NULL DEFAULT '[]');
                 CREATE TABLE IF NOT EXISTS customers (
                     id INTEGER PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL,
                     cpf TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', photo TEXT NOT NULL DEFAULT '',
@@ -76,10 +76,11 @@ class Store:
             """)
             columns = {row[1] for row in db.execute("PRAGMA table_info(customers)")}
             missing = set(CUSTOMER_DEFAULTS) - columns
-            if missing:
+            product_columns = {row[1] for row in db.execute("PRAGMA table_info(products)")}
+            if missing or "composition" not in product_columns:
                 backup_dir = self.data_dir / "copias_antes_atualizacao"
                 backup_dir.mkdir(exist_ok=True)
-                target = backup_dir / f"antes-v2-{datetime.now():%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}.sqlite3"
+                target = backup_dir / f"antes-v3-{datetime.now():%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:6]}.sqlite3"
                 with closing(sqlite3.connect(target)) as dest:
                     db.backup(dest)
                 db.execute("BEGIN IMMEDIATE")
@@ -87,15 +88,28 @@ class Store:
                 for field in sorted(set(CUSTOMER_DEFAULTS) - columns):
                     definition = "INTEGER NOT NULL DEFAULT 1" if field == "active" else "TEXT NOT NULL DEFAULT ''"
                     db.execute(f"ALTER TABLE customers ADD COLUMN {field} {definition}")
+                if "composition" not in {row[1] for row in db.execute("PRAGMA table_info(products)")}:
+                    db.execute("ALTER TABLE products ADD COLUMN composition TEXT NOT NULL DEFAULT '[]'")
             if not db.execute("SELECT 1 FROM settings WHERE key='initialized'").fetchone():
-                seeds = [("Bolo Simples", CATEGORIES[0], "Bolo por quilo com recheios simples. Mínimo de 2 kg.", "kg", 7500),
-                         ("Bolo Especial", CATEGORIES[1], "Bolo por quilo com recheios especiais.", "kg", 8500)]
-                seeds.extend((name, category, "Cadastre a descrição e o preço antes de vender.", unit, 0)
-                             for name, category, unit in [("Cento de Brigadeiros", CATEGORIES[2], "cento"),
-                             ("Kit Festa", CATEGORIES[3], "un"), ("Cupcake", CATEGORIES[4], "un"),
-                             ("Mini Donut", CATEGORIES[5], "un"), ("Topo de Bolo", CATEGORIES[6], "un")])
-                db.executemany("INSERT INTO products(name,category,description,unit,price_cents) VALUES(?,?,?,?,?)", seeds)
+                from .catalog_data import product_templates
+                for item in product_templates():
+                    db.execute("INSERT INTO products(name,category,description,unit,price_cents,composition) VALUES(?,?,?,?,?,?)",
+                               (item["name"], item["category"], item["description"], item["unit"], item.get("price_cents", 0), json.dumps(item.get("composition", []))))
                 db.execute("INSERT INTO settings VALUES('initialized','true')")
+            if not db.execute("SELECT 1 FROM settings WHERE key='catalog_v3'").fetchone():
+                from .catalog_data import product_templates
+                legacy = {"Cadastre a descrição e o preço antes de vender.", "Bolo por quilo com recheios simples. Mínimo de 2 kg.", "Bolo por quilo com recheios especiais."}
+                old_kit = db.execute("SELECT * FROM products WHERE name='Kit Festa' AND category='Kits Festa'").fetchone()
+                if old_kit and old_kit["description"] in legacy and not db.execute("SELECT 1 FROM products WHERE name='Kit Festa 1'").fetchone():
+                    db.execute("UPDATE products SET name='Kit Festa 1' WHERE id=?", (old_kit["id"],))
+                for item in product_templates():
+                    found = db.execute("SELECT * FROM products WHERE name=? AND category=?", (item["name"], item["category"])).fetchone()
+                    if not found:
+                        db.execute("INSERT INTO products(name,category,description,unit,price_cents,composition) VALUES(?,?,?,?,?,?)",
+                                   (item["name"], item["category"], item["description"], item["unit"], item.get("price_cents", 0), json.dumps(item.get("composition", []))))
+                    elif found["description"] in legacy:
+                        db.execute("UPDATE products SET description=?,composition=? WHERE id=?", (item["description"], json.dumps(item.get("composition", [])), found["id"]))
+                db.execute("INSERT INTO settings VALUES('catalog_v3','true')")
 
     def list(self, table):
         if table not in {"products", "customers", "inventory"}:
@@ -105,10 +119,13 @@ class Store:
         if table == "products":
             for row in rows:
                 row["photos"] = json.loads(row["photos"])
+                row["composition"] = json.loads(row["composition"])
         return rows
 
     def save_product(self, values, product_id=None):
         values = dict(values)
+        previous = next((p for p in self.list("products") if p["id"] == product_id), {}) if product_id else {}
+        values.setdefault("composition", previous.get("composition", []))
         if not values["name"].strip() or values["category"] not in CATEGORIES:
             raise ValueError("Informe nome e categoria válidos.")
         expected_unit = "kg" if values["category"] in CATEGORIES[:2] else "cento" if values["category"] == CATEGORIES[2] else "un"
@@ -123,6 +140,9 @@ class Store:
         if len(values["photos"]) > 3:
             raise ValueError("Use até três fotos por produto.")
         values["photos"] = json.dumps(values["photos"])
+        if not isinstance(values["composition"], list) or any(not isinstance(item, str) or not item.strip() for item in values["composition"]):
+            raise ValueError("Informe a composição como uma lista de itens preenchidos.")
+        values["composition"] = json.dumps(values["composition"])
         return self._save("products", values, product_id)
 
     def save_customer(self, values, customer_id=None):
@@ -159,7 +179,7 @@ class Store:
 
     def _save(self, table, values, item_id):
         fields = {
-            "products": {"name", "category", "description", "unit", "price_cents", "promo_enabled", "promo_cents", "promo_start", "promo_end", "photos", "active"},
+            "products": {"name", "category", "description", "unit", "price_cents", "promo_enabled", "promo_cents", "promo_start", "promo_end", "photos", "active", "composition"},
             "customers": set(CUSTOMER_DEFAULTS),
             "inventory": {"name", "brand", "content", "content_unit", "stock", "package_unit", "paid_cents", "photo"},
         }
@@ -201,6 +221,11 @@ class Store:
                 raise ValueError("Selecione um cliente cadastrado.")
             payload["customer"] = dict(customer)
             payload["shop"] = self.settings()
+            override = payload.pop("logo_override", "")
+            if override:
+                if not self.image_path(override):
+                    raise ValueError("A logo selecionada não foi encontrada.")
+                payload["shop"]["logo"] = override
             if quote_id:
                 previous = db.execute("SELECT * FROM quotes WHERE id=?", (quote_id,)).fetchone()
                 if not previous or previous["delivered"] or db.execute("SELECT 1 FROM payments WHERE quote_id=?", (quote_id,)).fetchone():
@@ -235,6 +260,18 @@ class Store:
     def payments(self, quote_id):
         with self.db() as db:
             return [dict(r) for r in db.execute("SELECT * FROM payments WHERE quote_id=? ORDER BY id", (quote_id,))]
+
+    def update_quote_logo(self, quote_id, logo):
+        if not self.image_path(logo):
+            raise ValueError("Envie uma logo válida antes de atualizar o orçamento.")
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT payload FROM quotes WHERE id=?", (quote_id,)).fetchone()
+            if not row:
+                raise ValueError("Orçamento não encontrado.")
+            payload = json.loads(row["payload"])
+            payload["shop"]["logo"] = logo
+            db.execute("UPDATE quotes SET payload=? WHERE id=?", (json.dumps(payload), quote_id))
 
     def add_payment(self, quote_id, amount_cents, method, note=""):
         if amount_cents <= 0 or method not in ("PIX", "Dinheiro", "Cartão"):
