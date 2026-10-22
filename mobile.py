@@ -1,6 +1,7 @@
 """Entrada web instalável no Android/iOS, com autenticação e proxy privado do Streamlit."""
 import argparse
 import asyncio
+import base64
 from collections import defaultdict, deque
 import hashlib
 import hmac
@@ -39,6 +40,26 @@ class Home(Base):
     @tornado.web.authenticated
     def get(self):
         self.render(str(WEB / "index.html"))
+
+
+class Identity(Base):
+    @tornado.web.authenticated
+    def get(self):
+        from io import BytesIO
+        from PIL import Image, ImageOps
+        from confeitaria.storage import Store
+        store = Store()
+        settings = store.settings()
+        logo = ""
+        path = store.image_path(settings["logo"])
+        if path:
+            with Image.open(path) as image:
+                thumb = ImageOps.exif_transpose(image).convert("RGBA")
+                thumb.thumbnail((192, 192))
+                output = BytesIO()
+                thumb.save(output, "PNG")
+            logo = "data:image/png;base64," + base64.b64encode(output.getvalue()).decode()
+        self.write({"name": settings["name"], "logo": logo})
 
 
 class Login(Base):
@@ -205,7 +226,7 @@ def make_application(backend, password, cookie_secret, public_url):
         raise ValueError("Use HTTPS para instalar e proteger o acesso no celular.")
     origin = f"{public.scheme}://{public.netloc}"
     return tornado.web.Application([
-        (r"/", Home), (r"/entrar", Login), (r"/sair", Logout), (r"/saude", Health),
+        (r"/", Home), (r"/identidade", Identity), (r"/entrar", Login), (r"/sair", Logout), (r"/saude", Health),
         (r"/(manifest.webmanifest|sw.js|mobile.js|mobile.css|offline.html|icone-192.png|icone-512.png|apple-touch-icon.png)", PublicFile, {"path":str(WEB)}),
         (r"/sistema/_stcore/stream", Stream), (r"/sistema(?:/(.*))?", Proxy),
     ], backend=backend.rstrip("/"), password_digest=hashlib.sha256(password.encode()).digest(),

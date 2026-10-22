@@ -1,6 +1,10 @@
 import json
+from io import BytesIO
+import os
 import re
+import tempfile
 import unittest
+from unittest.mock import patch
 from urllib.parse import urlencode
 
 import tornado.httpclient
@@ -34,6 +38,12 @@ class EchoStream(tornado.websocket.WebSocketHandler):
 
 
 class MobileTests(AsyncHTTPTestCase):
+    def setUp(self):
+        self.brand_data = tempfile.TemporaryDirectory()
+        self.brand_env = patch.dict(os.environ, {"CONFEITARIA_DATA_DIR": self.brand_data.name + "/dados", "CONFEITARIA_MEDIA_DIR": self.brand_data.name + "/midia"})
+        self.brand_env.start()
+        super().setUp()
+
     def get_app(self):
         self.password="senha-de-teste-segura"
         self.secret="chave-de-teste-"*5
@@ -48,6 +58,27 @@ class MobileTests(AsyncHTTPTestCase):
         self.backend_server.stop()
         self.io_loop.run_sync(self.backend_server.close_all_connections)
         super().tearDown()
+        self.brand_env.stop()
+        self.brand_data.cleanup()
+
+    def test_identity_follows_saved_shop_and_requires_login(self):
+        from PIL import Image
+        from confeitaria.storage import Store
+        store = Store()
+        image = BytesIO()
+        Image.new("RGB", (1000, 100), "#d86b52").save(image, "PNG")
+        settings = store.settings()
+        settings.update(name='Doces & Afeto <Loja>', logo=store.save_image(image))
+        store.save_settings(settings)
+        self.assertEqual(self.fetch("/identidade", follow_redirects=False).code, 302)
+        response = self.fetch("/identidade", headers={"Cookie": self.cookie()})
+        brand = json.loads(response.body)
+        self.assertEqual(brand["name"], settings["name"])
+        self.assertTrue(brand["logo"].startswith("data:image/png;base64,"))
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+        settings["logo"] = ""
+        store.save_settings(settings)
+        self.assertEqual(json.loads(self.fetch("/identidade", headers={"Cookie": self.cookie()}).body)["logo"], "")
 
     def cookie(self):
         signed=tornado.web.create_signed_value(self.secret,"doce_session","owner").decode()

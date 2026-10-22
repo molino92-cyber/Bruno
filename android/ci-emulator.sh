@@ -6,7 +6,7 @@ adb shell am start -W -n br.com.doceatelie/.MainActivity
 sleep 2
 previous_app_uid=$(adb shell pm list packages -U br.com.doceatelie | awk '$1=="package:br.com.doceatelie" {print $2}')
 adb shell am force-stop br.com.doceatelie
-adb install -r android/distribuicao/DoceAtelie-Android-1.0.1.apk
+adb install -r android/distribuicao/DoceAtelie-Android-1.0.2.apk
 updated_app_uid=$(adb shell pm list packages -U br.com.doceatelie | awk '$1=="package:br.com.doceatelie" {print $2}')
 test -n "$previous_app_uid"
 test "$previous_app_uid" = "$updated_app_uid"

@@ -5,7 +5,7 @@
   <link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="stylesheet" href="/mobile.css">
   <title>Doce Ateliê · Confeitaria</title><script src="/mobile.js" defer></script>
 </head><body class="workspace">
-  <header><strong>🧁 Doce Ateliê</strong><nav><button id="install" hidden>Instalar no celular</button><button id="help">Como instalar</button><form method="post" action="/sair">{% module xsrf_form_html() %}<button>Sair</button></form></nav></header>
+  <header><div class="shop-brand"><span id="brand-logo">🧁</span><strong id="brand-name">Minha Confeitaria</strong></div><nav><button id="install" hidden>Instalar no celular</button><button id="help">Como instalar</button><form method="post" action="/sair">{% module xsrf_form_html() %}<button>Sair</button></form></nav></header>
   <section id="instructions" hidden><p><b>Android:</b> no Chrome, toque em ⋮ → Instalar aplicativo ou Adicionar à tela inicial.</p><p><b>iPhone / iPad:</b> no Safari, toque em Compartilhar → Adicionar à Tela de Início.</p><p>O sistema precisa de conexão com o servidor. Use o menu lateral para navegar entre clientes, produtos e pedidos.</p><button id="close-help">Entendi</button></section>
   <aside id="offline" hidden>Sem conexão. Seus dados continuam no servidor. Reconecte-se para continuar.</aside>
   <main><iframe id="system" src="/sistema/" title="Sistema de gestão da confeitaria" allow="clipboard-write" ></iframe></main>

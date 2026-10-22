@@ -3,7 +3,7 @@ from pathlib import Path
 import zipfile
 
 root=Path(__file__).resolve().parent.parent
-output=root/"dist"/"DoceAtelie-Android-iOS-1.2.0.zip"
+output=root/"dist"/"DoceAtelie-Android-iOS-1.2.1.zip"
 output.parent.mkdir(exist_ok=True)
 files=[root/name for name in ["app.py","mobile.py","requirements.txt","README.md"]]
 for folder in ["confeitaria","assets","web/mobile","deploy",".streamlit"]:

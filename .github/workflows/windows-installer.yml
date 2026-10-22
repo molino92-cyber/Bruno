@@ -83,3 +83,40 @@ jobs:
           name: DoceAtelie-Android-iOS-PWA
           path: dist/DoceAtelie-Android-iOS-*.zip
           if-no-files-found: error
+  publish:
+    name: Publicar instalador com download direto
+    needs: [build, mobile]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: DoceAtelie-Instalador-Windows-x64
+          path: instalador
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const crypto = require('crypto');
+            const files = fs.readdirSync('instalador').filter(f => /^DoceAtelie-Instalador-\d+\.\d+\.\d+-Windows-x64\.exe$/.test(f));
+            if (files.length !== 1) throw new Error('Esperado exatamente um instalador Windows.');
+            const filename = files[0];
+            const version = filename.match(/Instalador-(\d+\.\d+\.\d+)-/)[1];
+            const tag = 'windows-v' + version;
+            const data = fs.readFileSync('instalador/' + filename);
+            const sha = crypto.createHash('sha256').update(data).digest('hex');
+            const body = `Nome e logo da confeitaria editáveis em Configurações, no cabeçalho e nos próximos orçamentos. Logo proporcional e dados preservados ao atualizar.\n\nBaixe o arquivo .exe abaixo e instale sobre a versão existente. Não precisa baixar ZIP nem ter conta GitHub.\n\nSHA-256: \`${sha}\``;
+            let release;
+            try {
+              release = (await github.rest.repos.getReleaseByTag({...context.repo, tag})).data;
+              // Uma versão já publicada é imutável. Para novo código, aumente a versão.
+              if (release.assets.some(a => a.name === filename)) {
+                core.info('Instalador desta versão já publicado.');
+                return;
+              }
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              release = (await github.rest.repos.createRelease({...context.repo, tag_name:tag, target_commitish:context.sha, name:'Windows ' + version + ' · Identidade da confeitaria', body, draft:false, prerelease:false})).data;
+            }
+            await github.rest.repos.uploadReleaseAsset({...context.repo, release_id:release.id, name:filename, data, headers:{'content-type':'application/octet-stream','content-length':data.length}});

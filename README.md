@@ -10,7 +10,11 @@ Consulte [como gerar e distribuir o instalador](packaging/README.md). O `.exe` p
 
 ## APK Android sem hospedagem
 
-A edição Android instala diretamente pelo arquivo **[DoceAtelie-Android-1.0.1.apk](android/distribuicao/DoceAtelie-Android-1.0.1.apk)** e funciona sem internet, com banco e fotos no celular. Inclui gestão de clientes, catálogo, orçamentos, pagamentos, agenda, PDFs e backup. O banco é independente do Windows. Consulte [instalação e recursos do APK](android/README.md).
+A edição Android instala diretamente pelo arquivo **[DoceAtelie-Android-1.0.2.apk](android/distribuicao/DoceAtelie-Android-1.0.2.apk)** e funciona sem internet, com banco e fotos no celular. Inclui gestão de clientes, catálogo, orçamentos, pagamentos, agenda, PDFs e backup. O banco é independente do Windows. Consulte [instalação e recursos do APK](android/README.md).
+
+## Personalizar nome e logo
+
+No **Windows → Configurações** ou **Android → Mais → Configurações e backup**, preencha **Nome da confeitaria** e envie sua **Logo da confeitaria · cabeçalho e PDFs**. Clique em **Salvar configurações**. O cabeçalho passa a mostrar a identidade da loja, com logo pequena e proporcional. Ela permanece salva ao reabrir e será usada nos próximos orçamentos. A opção de remover restaura o ícone padrão. A demonstração tem configurações separadas dos seus dados.
 
 ## Atualização 1.2 · Windows, Android e iOS
 

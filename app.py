@@ -11,13 +11,9 @@ from confeitaria.domain import (BRIGADEIRO_TYPES, CATEGORIES, EXTRAS, PAYMENT_ME
                                 SPECIAL_FILLINGS, UNITS, active_price, brl, cents, make_line, quantity_text, totals)
 from confeitaria.pdf import formatted_date, generate_pdf
 from confeitaria.storage import Store, inventory_cost
-from confeitaria.presentation import apply_theme, date_field, heading, table, media_thumbnail
+from confeitaria.presentation import apply_theme, brand_html, date_field, heading, table, media_thumbnail
 from confeitaria.ui_customers import change_customer_view, customers_page
 from confeitaria.ui_quotes import quote_editor_page
-
-st.set_page_config(page_title="Doce Ateliê · Gestão", page_icon="🧁", layout="wide")
-apply_theme()
-
 
 @st.cache_resource
 def get_store(demo=False):
@@ -29,6 +25,10 @@ def get_store(demo=False):
 
 
 store = get_store(st.session_state.get("demo_mode", False))
+shop = store.settings()
+shop_logo = store.image_path(shop["logo"])
+st.set_page_config(page_title=f'{shop["name"]} · Gestão', page_icon=str(shop_logo) if shop_logo else "🧁", layout="wide")
+apply_theme()
 
 
 def hero(label, title, subtitle):
@@ -394,23 +394,25 @@ def settings_page():
     hero("SUA CONFEITARIA", "Configurações", "Identidade da loja, documentos e cópias de segurança.")
     settings = store.settings()
     with st.form("settings"):
-        name = st.text_input("Nome da confeitaria *", settings["name"])
+        st.caption("Personalize o nome e a logo exibidos no sistema e nos próximos orçamentos. Você pode alterá-los quando precisar.")
+        name = st.text_input("Nome da confeitaria *", settings["name"], max_chars=150)
         a, b = st.columns(2)
         phone = a.text_input("Telefone / WhatsApp da loja", settings["phone"])
         document = b.text_input("CNPJ / CPF da loja", settings["document"])
         address = st.text_area("Endereço da loja", settings["address"])
         days = st.number_input("Alterações aceitas até quantos dias antes do evento?", min_value=0, max_value=365, value=int(settings["change_days"]))
-        logo = st.file_uploader("Logo para os PDFs", ["jpg", "jpeg", "png", "webp"])
+        logo = st.file_uploader("Logo da confeitaria · cabeçalho e PDFs", ["jpg", "jpeg", "png", "webp"])
         remove_logo = st.checkbox("Remover logo atual")
         if st.form_submit_button("Salvar configurações", type="primary"):
             try:
                 logo_name = store.save_image(logo) if logo else "" if remove_logo else settings["logo"]
                 store.save_settings({"name": name.strip(), "phone": phone.strip(), "document": document.strip(), "address": address.strip(), "change_days": int(days), "logo": logo_name})
-                flash("Configurações salvas. Serão usadas nos próximos orçamentos salvos.")
+                flash("Nome e logo atualizados no sistema. Serão usados também nos próximos orçamentos salvos.")
             except ValueError as exc:
                 st.error(str(exc))
-    if settings["logo"]:
-        image(settings["logo"], width=180)
+    st.caption("Identidade atual · a logo se ajusta ao quadro sem distorcer")
+    with st.container(border=True):
+        st.markdown(f'<div class="brand-preview">{brand_html(settings, store)}</div>', unsafe_allow_html=True)
     st.subheader("Cópia de segurança")
     st.write("O arquivo ZIP reúne uma cópia consistente do SQLite e todas as fotos. Faça backup regularmente e antes de atualizar o aplicativo.")
     if st.button("Preparar cópia de segurança"):
@@ -442,8 +444,7 @@ def switch_demo():
 
 
 with st.sidebar:
-    st.markdown('<div class="brand"><div class="brand-icon">🧁</div><div><strong>Doce Ateliê</strong><small>GESTÃO DA CONFEITARIA</small></div></div>', unsafe_allow_html=True)
-    st.caption(store.settings()["name"])
+    st.markdown(brand_html(shop, store), unsafe_allow_html=True)
     st.toggle("Ver demonstração", key="demo_mode", on_change=switch_demo, help="Exemplos com imagens em um banco separado dos seus dados.")
     st.markdown('<div class="nav-caption">SEU ESPAÇO DE TRABALHO</div>', unsafe_allow_html=True)
     page_labels = {"Visão geral": "◫  Visão geral", "Catálogo": "▦  Produtos", "Insumos e estoque": "▣  Estoque e insumos", "Clientes": "♧  Clientes", "Novo orçamento": "＋  Novo orçamento", "Orçamentos e pagamentos": "▤  Pedidos e pagamentos", "Agenda de produção": "▦  Agenda da cozinha", "Configurações": "⚙  Configurações"}

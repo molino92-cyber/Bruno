@@ -2,9 +2,13 @@
 
 O empacotamento produz um **instalador Windows x64** e uma versão portátil. Python, Streamlit e todas as dependências acompanham o aplicativo. **O cliente não precisa instalar Python nem executar comandos.** A interface continua abrindo no navegador local; uma pequena janela controla Abrir / Encerrar.
 
+## Baixar o instalador
+
+O workflow publica o `.exe` testado em uma [Release pública](https://github.com/molino92-cyber/Bruno/releases), permitindo baixar diretamente, sem ZIP e sem conta GitHub. O link da versão atual é [DoceAtelie-Instalador-1.2.1-Windows-x64.exe](https://github.com/molino92-cyber/Bruno/releases/download/windows-v1.2.1/DoceAtelie-Instalador-1.2.1-Windows-x64.exe). A publicação ocorre somente após os testes do executável Windows e do servidor passarem.
+
 ## Experiência do cliente
 
-1. Executar `DoceAtelie-Instalador-1.2.0-Windows-x64.exe`.
+1. Executar `DoceAtelie-Instalador-1.2.1-Windows-x64.exe`.
 2. Seguir o instalador em português. A instalação é por usuário, sem exigir administrador.
 3. Abrir **Doce Ateliê** pelo menu Iniciar ou pelo atalho da área de trabalho.
 4. O navegador abre automaticamente quando o sistema está pronto. Manter a pequena janela Doce Ateliê aberta durante o uso.
@@ -44,7 +48,7 @@ O script cria `.venv-build`, instala dependências, executa os testes, empacota 
 
 ```text
 dist\DoceAtelie\DoceAtelie.exe
-dist\instalador\DoceAtelie-Instalador-1.2.0-Windows-x64.exe
+dist\instalador\DoceAtelie-Instalador-1.2.1-Windows-x64.exe
 ```
 
 O teste do binário verifica SQLite, mídia, orçamento/sinal, os dois PDFs, backup, resposta HTTP, renderização da interface por WebSocket e encerramento do servidor. Todo teste usa perfil temporário e não altera dados reais.

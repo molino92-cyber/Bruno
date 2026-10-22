@@ -21,8 +21,43 @@ with sync_playwright() as p:
   page.get_by_label('Confirmo que este valor já foi recebido').check();page.get_by_role('button',name='Registrar recebimento').click();assert page.get_by_text('Aprovado / Data Reservada',exact=True).count()
   page.get_by_label('Confirmo que este valor já foi recebido').check();page.get_by_role('button',name='Registrar recebimento').click();page.get_by_role('button',name='Concluir entrega / retirada').click();page.get_by_role('button',name='Confirmar',exact=True).click();assert page.get_by_text('Entregue',exact=True).count()
   page.reload();page.get_by_role('button',name='Pedidos',exact=True).click();assert page.get_by_text('Maria do Android',exact=False).count();assert not errors,errors
+  # A identidade substitui o cabeçalho, persiste e não modifica pedidos anteriores.
+  from io import BytesIO
+  from PIL import Image
+  logo=BytesIO();Image.new('RGB',(1800,180),'#d86b52').save(logo,'PNG')
+  def settings():
+   page.get_by_role('button',name='Mais',exact=True).click();page.get_by_role('button',name='Configurações e backup',exact=True).click()
+  settings();shop_name='Doces & Afeto <Loja>'
+  page.get_by_label('Nome da confeitaria *',exact=True).fill(shop_name)
+  page.locator('input[data-photo="logo"]').set_input_files({'name':'logo.png','mimeType':'image/png','buffer':logo.getvalue()})
+  page.locator('#photos_logo img').wait_for()
+  page.get_by_role('button',name='Salvar configurações',exact=True).click()
+  assert page.locator('header strong').inner_text()==shop_name
+  assert page.title()==shop_name+' · Gestão'
+  page.locator('#brand-logo img').wait_for();page.reload()
+  assert page.locator('header strong').inner_text()==shop_name
+  assert page.locator('#brand-logo img').count()==1
+  assert page.evaluate("state.quotes[0].shop.name")=='Minha Confeitaria'
+  assert page.evaluate("state.quotes[0].totals.total_cents")==14600
+  assert page.evaluate("L.status(state.quotes[0])")=='Entregue'
+  for width in [320,390,768,1366]:
+   page.set_viewport_size({'width':width,'height':844})
+   assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),width
+   assert page.locator('#brand-logo').bounding_box()['height']==44
+   assert page.locator('#brand-logo img').evaluate("img=>getComputedStyle(img).objectFit")=='contain'
+  page.set_viewport_size({'width':390,'height':844})
+  settings();page.get_by_label('Nome da confeitaria *',exact=True).fill('Confeitaria Artesanal de Bolos e Doces Personalizados para Festas e Eventos')
+  page.get_by_role('button',name='Salvar configurações',exact=True).click()
+  assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+  page.screenshot(path='/tmp/doce-android-identidade.png',full_page=True)
+  settings();page.locator('#photos_logo').get_by_role('button',name='Remover',exact=True).click()
+  page.get_by_role('button',name='Salvar configurações',exact=True).click();page.reload()
+  assert page.locator('#brand-logo img').count()==0
+  assert page.locator('#brand-logo').inner_text()=='🧁'
+  assert page.locator('header strong').inner_text().startswith('Confeitaria Artesanal')
+  assert not errors,errors
   page.screenshot(path='/tmp/doce-android-pedidos.png',full_page=True)
-  print('OK: cadastro, edição, orçamento, desconto manual, saldo, recebimentos, entrega, PDFs, persistência e JavaScript sem erros.')
+  print('OK: cadastro, edição, orçamento, desconto manual, saldo, recebimentos, entrega, PDFs, persistência, personalização do nome/logo, remoção, layout responsivo e JavaScript sem erros.')
  except Exception:
   print('ERRO:',page.locator('body').inner_text()[-4000:]);page.screenshot(path='/tmp/doce-android-erro.png',full_page=True);raise
  finally:b.close()

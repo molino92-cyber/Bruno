@@ -4,7 +4,7 @@ O aplicativo Android **instala por APK e funciona sozinho no celular**, sem Pyth
 
 ## Instalar
 
-1. No Android, baixe [`DoceAtelie-Android-1.0.1.apk`](distribuicao/DoceAtelie-Android-1.0.1.apk).
+1. No Android, baixe [`DoceAtelie-Android-1.0.2.apk`](distribuicao/DoceAtelie-Android-1.0.2.apk).
 2. Abra o arquivo baixado. Se o Android solicitar, permita que o navegador ou gerenciador de arquivos usado instale este aplicativo. Não é necessário desativar o Play Protect.
 3. Toque em **Instalar** e abra **Doce Ateliê** pelo ícone.
 4. Em **Mais → Configurações e backup**, cadastre a identidade e a logo da loja. Confira os preços do catálogo: R$ 75/kg para o Simples e R$ 85/kg para o Especial; os demais preços reais ficam para cadastrar.
@@ -13,7 +13,11 @@ Para atualizar, instale um APK mais recente da mesma assinatura sobre o aplicati
 
 O APK é para Android. iPhone não instala arquivos APK.
 
-## Atualização 1.0.1
+## Atualização 1.0.2
+
+Em **Mais → Configurações e backup**, altere **Nome da confeitaria** e envie sua **Logo da confeitaria · cabeçalho e PDFs**. Ao salvar, a identidade substitui o nome e o cupcake do cabeçalho. A logo mantém a proporção em um quadro pequeno. Nome e imagem permanecem salvos ao fechar e reabrir o aplicativo. Remover a logo restaura o ícone padrão. Pedidos anteriores preservam a identidade registrada no orçamento; os próximos usam a nova.
+
+## Correção incluída desde 1.0.1
 
 Correção da área segura da tela: cabeçalho abaixo da barra de status e menu acima da navegação Android, tanto por gestos quanto por três botões. O teclado reduz a área do aplicativo sem somar os espaços duas vezes. Ícones vetoriais e textos do menu têm contraste maior. A assinatura e o banco são mantidos; instale por cima da versão 1.0.0.
 

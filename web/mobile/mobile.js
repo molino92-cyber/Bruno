@@ -1,4 +1,21 @@
 /* Interface instalável. Nenhum cadastro ou documento é salvo no cache offline. */
+async function refreshBrand() {
+  const name = document.getElementById('brand-name');
+  if (!name || document.hidden || !navigator.onLine) return;
+  try {
+    const response = await fetch('/identidade', {cache:'no-store'});
+    if (!response.ok || !response.headers.get('Content-Type')?.includes('application/json')) return;
+    const shop = await response.json();
+    name.textContent = shop.name; document.title = shop.name + ' · Gestão';
+    const box = document.getElementById('brand-logo');
+    box.replaceChildren();
+    if (typeof shop.logo === 'string' && shop.logo.startsWith('data:image/png;base64,')) {
+      const logo = document.createElement('img'); logo.alt = 'Logo da confeitaria'; logo.src = shop.logo; box.append(logo);
+    } else box.textContent = '🧁';
+  } catch (_) { /* Manter o cabeçalho atual quando a conexão falhar. */ }
+}
+refreshBrand(); setInterval(refreshBrand, 15000);
+window.addEventListener('focus', refreshBrand);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 let installation;
 const install = document.getElementById('install');

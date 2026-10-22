@@ -55,6 +55,33 @@ class InterfaceTests(unittest.TestCase):
     def client(self):
         return self.store.save_customer({"name": "Maria dos Bolos", "phone": "92999998888", "cpf": "", "street": "Rua A", "number": "42", "city": "Manaus", "state": "AM", "postal_code": "69000000", "photo": ""})
 
+    def test_brand_settings_replace_header_persist_and_remove_logo(self):
+        from io import BytesIO
+        from PIL import Image
+        photo = BytesIO()
+        Image.new("RGBA", (1200, 180), "#d86b52").save(photo, "PNG")
+        settings = self.store.settings()
+        settings["logo"] = self.store.save_image(photo)
+        self.store.save_settings(settings)
+        self.page("Configurações")
+        self.widget("text_input", "Nome da confeitaria *").set_value('Doces & Afeto <Ateliê>')
+        self.click("Salvar configurações")
+        header = self.app.sidebar.markdown[0].value
+        self.assertIn('Doces &amp; Afeto &lt;Ateliê&gt;', header)
+        self.assertIn('alt="Logo da confeitaria"', header)
+        self.assertIn('data:image/png;base64,', header)
+        st.cache_resource.clear()
+        self.app = AppTest.from_file(str(Path(__file__).resolve().parent.parent / "app.py"), default_timeout=15).run()
+        self.assert_clean()
+        self.assertIn('Doces &amp; Afeto', self.app.sidebar.markdown[0].value)
+        self.assertIn('data:image/png;base64,', self.app.sidebar.markdown[0].value)
+        self.page("Configurações")
+        self.widget("checkbox", "Remover logo atual").check()
+        self.click("Salvar configurações")
+        self.assertNotIn('<img', self.app.sidebar.markdown[0].value)
+        self.assertIn('Doces &amp; Afeto', self.app.sidebar.markdown[0].value)
+        self.assertEqual(Store().settings()["logo"], "")
+
     def start_quote(self, client=None):
         client = client or self.client()
         self.page("Novo orçamento")

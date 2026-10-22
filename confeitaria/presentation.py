@@ -38,9 +38,14 @@ def apply_theme():
     .hero h1 {margin:0;padding:0!important;}
     .hero p {color:#74828e;margin-top:9px;font-size:.92rem;}
     .brand {display:flex;align-items:center;gap:12px;margin:10px 0 30px;}
-    .brand-icon {font-size:27px;background:#f1c8b9;border-radius:12px;padding:8px;line-height:1;}
-    .brand strong {font-size:1.35rem;color:#fff!important;letter-spacing:-.03em;}
+    .brand-icon {font-size:27px;background:#f1c8b9;border-radius:12px;width:48px;height:48px;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;line-height:1;}
+    .brand-icon.has-logo {background:#fff;}
+    .brand-icon img {width:100%;height:100%;object-fit:contain;}
+    .brand-text {min-width:0;overflow-wrap:anywhere;}
+    .brand strong {display:block;font-size:1.2rem;line-height:1.25;color:#fff!important;letter-spacing:-.03em;}
     .brand small {display:block;font-size:.67rem;color:#9db2bd!important;letter-spacing:.13em;margin-top:4px;}
+    .brand-preview {background:#182a35;border-radius:12px;padding:18px;max-width:360px;}
+    .brand-preview .brand {margin:0;}
     .nav-caption {color:#8099a7!important;font-size:.65rem;letter-spacing:.14em;margin:12px 0;}
     .sidebar-footer {margin-top:32px;border:1px solid #35505c;border-radius:12px;padding:14px;}
     .sidebar-footer strong {font-size:.8rem;display:block;color:#d8e7ec!important;}
@@ -153,6 +158,18 @@ def media_thumbnail(name, store, height=170, label="Foto do produto"):
     else:
         content = '<span aria-label="Sem foto cadastrada" style="font-size:2rem">🧁</span>'
     st.markdown(f'<div class="media-frame" style="height:{int(height)}px">{content}</div>', unsafe_allow_html=True)
+
+
+def brand_html(settings, store):
+    """Identidade cadastrada, com logo proporcional e nome tratado como texto."""
+    path = store.image_path(settings.get("logo", ""))
+    icon = "🧁"
+    if path:
+        encoded = _thumbnail(str(path), path.stat().st_mtime_ns)
+        icon = f'<img alt="Logo da confeitaria" src="data:image/png;base64,{encoded}">'
+    return (f'<div class="brand"><div class="brand-icon{" has-logo" if path else ""}">{icon}</div>'
+            f'<div class="brand-text"><strong>{escape(settings["name"])}</strong>'
+            '<small>GESTÃO DA CONFEITARIA</small></div></div>')
 
 
 def avatar_html(customer, store):
