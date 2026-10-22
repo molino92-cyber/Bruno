@@ -1,0 +1,1 @@
+"""Gestão local de confeitaria."""

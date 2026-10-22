@@ -1,0 +1,40 @@
+name: Gerar instalador Windows
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/doce-atelie
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Instalar Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --version=6.4.3 --yes --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar Inno Setup." }
+          }
+      - name: Testar e gerar executável e instalador
+        shell: pwsh
+        run: ./packaging/build-windows.ps1
+      - name: Disponibilizar instalador
+        uses: actions/upload-artifact@v4
+        with:
+          name: DoceAtelie-Instalador-Windows-x64
+          path: dist/instalador/*.exe
+          if-no-files-found: error
+      - name: Disponibilizar versão portátil
+        uses: actions/upload-artifact@v4
+        with:
+          name: DoceAtelie-Portatil-Windows-x64
+          path: dist/DoceAtelie/
+          if-no-files-found: error

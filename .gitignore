@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+dados/
+midia/
+.streamlit/secrets.toml
+*.log
+.venv-build/
+build/
+dist/
