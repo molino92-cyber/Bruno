@@ -118,3 +118,10 @@ class ReminderTests(unittest.TestCase):
                 self.assertIn(str(self.store.data_dir.resolve()),action['Arguments'])
             finally:
                 configure_background(False,self.store)
+
+    @unittest.skipUnless(sys.platform=='win32','Toast nativo pertence ao Windows')
+    def test_windows_constructs_real_winrt_toast_with_escaped_store_name(self):
+        from confeitaria.notifications import _powershell, _toast_script
+        result=_powershell(_toast_script("Doces & Afeto <Loja>","Encomenda #0001 · amanhã às 14:00",show=False))
+        self.assertEqual(result.returncode,0,result.stderr.decode(errors='replace'))
+        self.assertIn(b'Doces &amp; Afeto &lt;Loja&gt;',result.stdout)

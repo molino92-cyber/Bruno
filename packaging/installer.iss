@@ -1,6 +1,6 @@
 ; Inno Setup 6. Gerar após o PyInstaller: ISCC.exe packaging\installer.iss
 #ifndef AppVersion
-  #define AppVersion "1.3.0"
+  #define AppVersion "1.3.1"
 #endif
 
 [Setup]

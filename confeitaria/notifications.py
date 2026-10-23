@@ -177,18 +177,27 @@ def _powershell(script):
                           capture_output=True, timeout=30, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
 
 
-def show_notification(title, text):
-    if sys.platform != 'win32':
-        raise ValueError('Notificações do computador estão disponíveis no instalador Windows.')
+def _toast_script(title, text, show=True):
     xml = '<toast><visual><binding template="ToastGeneric"><text>' + escape(title) + '</text><text>' + escape(text) + '</text></binding></visual></toast>'
     encoded = base64.b64encode(xml.encode('utf-8')).decode('ascii')
-    result = _powershell("""$ErrorActionPreference='Stop'; [Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime] > $null;
+    script = """$ErrorActionPreference='Stop'; [Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime] > $null;
+    [Windows.UI.Notifications.ToastNotification,Windows.UI.Notifications,ContentType=WindowsRuntime] > $null;
     [Windows.Data.Xml.Dom.XmlDocument,Windows.Data.Xml.Dom.XmlDocument,ContentType=WindowsRuntime] > $null;
     $xml=New-Object Windows.Data.Xml.Dom.XmlDocument;
     $xml.LoadXml([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('""" + encoded + """')));
-    $notifier=[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('DoceAtelie.Pedidos');
+    $toast=[Windows.UI.Notifications.ToastNotification]::new($xml);
+    """
+    if not show:
+        return script + '$toast.Content.GetXml();'
+    return script + """$notifier=[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('DoceAtelie.Pedidos');
     if($notifier.Setting -ne 'Enabled'){throw 'Notificações bloqueadas no Windows'};
-    $notifier.Show([Windows.UI.Notifications.ToastNotification]::new($xml));""")
+    $notifier.Show($toast);"""
+
+
+def show_notification(title, text):
+    if sys.platform != 'win32':
+        raise ValueError('Notificações do computador estão disponíveis no instalador Windows.')
+    result = _powershell(_toast_script(title, text))
     if result.returncode:
         raise ValueError('Confira a permissão de notificações do Doce Ateliê nas configurações do Windows.')
 
