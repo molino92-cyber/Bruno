@@ -18,7 +18,10 @@ from .domain import CATEGORIES, CUSTOMER_DEFAULTS, decimal, normalize_customer, 
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_SETTINGS = {"name": "Minha Confeitaria", "phone": "", "address": "", "document": "",
-                    "logo": "", "change_days": 3}
+                    "logo": "", "change_days": 3, "reminders_enabled": False,
+                    "local_notifications": True, "alert_days": [3, 2], "alert_time": "09:00",
+                    "notification_email": "", "email_enabled": False, "smtp_host": "smtp.gmail.com",
+                    "smtp_port": 465, "smtp_security": "SSL/TLS", "smtp_username": "", "smtp_sender": ""}
 
 
 class Store:
@@ -199,6 +202,7 @@ class Store:
         return {**DEFAULT_SETTINGS, **(json.loads(row[0]) if row else {})}
 
     def save_settings(self, values):
+        values = {**self.settings(), **values}
         if not values["name"].strip() or not 0 <= int(values["change_days"]) <= 365:
             raise ValueError("Informe o nome da loja e um prazo entre 0 e 365 dias.")
         with self.db() as db:

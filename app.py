@@ -29,6 +29,9 @@ shop = store.settings()
 shop_logo = store.image_path(shop["logo"])
 st.set_page_config(page_title=f'{shop["name"]} · Gestão', page_icon=str(shop_logo) if shop_logo else "🧁", layout="wide")
 apply_theme()
+if not st.session_state.get("demo_mode", False):
+    from confeitaria.notifications import ensure_worker
+    ensure_worker(store)
 
 
 def hero(label, title, subtitle):
@@ -65,6 +68,14 @@ def quote_rows(quotes):
 def dashboard():
     hero("PAINEL DA CONFEITARIA", "Sua confeitaria em dia", "Acompanhe as encomendas, a produção e os recebimentos de um só lugar.")
     quotes = store.quotes()
+    if store.settings()["reminders_enabled"]:
+        from confeitaria.notifications import due_reminders
+        reminders = due_reminders(quotes, store.settings())
+        if reminders:
+            with st.container(border=True):
+                st.subheader(f"🔔 {len(reminders)} encomenda(s) precisam da sua atenção")
+                for reminder in reminders[:5]:
+                    st.write(reminder.text)
     approved = [q for q in quotes if "Data Reservada" in q["status"]]
     today = [q for q in approved if q["event_at"][:10] == date.today().isoformat()]
     with st.container(key="metrics_dashboard"):
@@ -413,6 +424,9 @@ def settings_page():
     st.caption("Identidade atual · a logo se ajusta ao quadro sem distorcer")
     with st.container(border=True):
         st.markdown(f'<div class="brand-preview">{brand_html(settings, store)}</div>', unsafe_allow_html=True)
+    with st.expander("🔔 Alertas de encomendas e e-mail"):
+        from confeitaria.ui_notifications import notification_settings
+        notification_settings(store, st.session_state.get("demo_mode", False))
     st.subheader("Cópia de segurança")
     st.write("O arquivo ZIP reúne uma cópia consistente do SQLite e todas as fotos. Faça backup regularmente e antes de atualizar o aplicativo.")
     if st.button("Preparar cópia de segurança"):

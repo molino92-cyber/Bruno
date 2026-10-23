@@ -1,6 +1,6 @@
 ; Inno Setup 6. Gerar após o PyInstaller: ISCC.exe packaging\installer.iss
 #ifndef AppVersion
-  #define AppVersion "1.2.1"
+  #define AppVersion "1.3.0"
 #endif
 
 [Setup]
@@ -35,7 +35,7 @@ Name: "desktopicon"; Description: "Criar atalho na área de trabalho"; GroupDesc
 Source: "..\dist\DoceAtelie\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Doce Ateliê"; Filename: "{app}\DoceAtelie.exe"
+Name: "{group}\Doce Ateliê"; Filename: "{app}\DoceAtelie.exe"; AppUserModelID: "DoceAtelie.Pedidos"
 Name: "{autodesktop}\Doce Ateliê"; Filename: "{app}\DoceAtelie.exe"; Tasks: desktopicon
 Name: "{group}\Desinstalar Doce Ateliê"; Filename: "{uninstallexe}"
 
@@ -43,3 +43,6 @@ Name: "{group}\Desinstalar Doce Ateliê"; Filename: "{uninstallexe}"
 Filename: "{app}\DoceAtelie.exe"; Description: "Abrir Doce Ateliê"; Flags: nowait postinstall skipifsilent
 
 ; Sem UninstallDelete: dados em LOCALAPPDATA\DoceAtelie são preservados.
+
+[UninstallRun]
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN DoceAtelie-Lembretes /F"; Flags: runhidden; RunOnceId: "remover-lembretes"

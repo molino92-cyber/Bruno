@@ -54,3 +54,9 @@ test('Backup rejeita referências de clientes, pagamentos e imagens inválidas',
  const good={schema:1,settings:{name:'Confeitaria'},products:[],customers:[{id:'c1'}],inventory:[],quotes:[{...quote(),id:'q1',customer_id:'c1'}],images:{}};assert.equal(L.validateBackup(good),good);
  assert.throws(()=>L.validateBackup({...good,customers:[]}),/cliente/);assert.throws(()=>L.validateBackup({...good,images:{p:'https://example.com/foto.png'}}),/imagem/);assert.throws(()=>L.validateBackup({...good,customers:[{id:'c1'},{id:'c1'}]}),/duplicados/);
 });
+
+test('Lembretes: dias, horário, e-mail e SMTP seguro',()=>{
+ const s=L.reminderSettings({...L.reminderDefaults,alert_days:[2,3,2],notification_email:'cozinha@example.com'});
+ assert.deepEqual(s.alert_days,[3,2]);assert.equal(s.alert_time,'09:00');
+ for(const invalid of [{alert_days:[]},{alert_time:'25:00'},{notification_email:'a\r\nBcc:b@example.com'},{email_enabled:true,smtp_security:'NONE'}])assert.throws(()=>L.reminderSettings({...s,...invalid}));
+});

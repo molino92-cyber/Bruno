@@ -2,6 +2,10 @@
 
 Sistema local em Python + Streamlit, com banco SQLite e fotos locais. A interface abre no navegador do próprio computador. A edição Windows não depende de servidor remoto, Excel ou serviços pagos; o acesso compartilhado por celular requer hospedagem.
 
+## Alertas de encomendas e e-mail
+
+Lembretes de três e dois dias antes (configuráveis), notificações no Windows e Android com a interface fechada e envio automático ao e-mail da confeitaria. Configure a conta de envio para habilitar e-mails. Os avisos param após a entrega. Veja [como configurar os alertas e o e-mail](docs/alertas.md).
+
 ## Instalador Windows para clientes
 
 O projeto inclui um inicializador com janela própria, empacotamento PyInstaller e instalador Inno Setup. O cliente instala pelo `.exe` e abre por um atalho, **sem instalar Python ou usar terminal**. Os dados ficam em `%LOCALAPPDATA%\DoceAtelie`, preservados nas atualizações. A interface permanece no navegador local.
@@ -10,7 +14,7 @@ Consulte [como gerar e distribuir o instalador](packaging/README.md). O `.exe` p
 
 ## APK Android sem hospedagem
 
-A edição Android instala diretamente pelo arquivo **[DoceAtelie-Android-1.0.2.apk](android/distribuicao/DoceAtelie-Android-1.0.2.apk)** e funciona sem internet, com banco e fotos no celular. Inclui gestão de clientes, catálogo, orçamentos, pagamentos, agenda, PDFs e backup. O banco é independente do Windows. Consulte [instalação e recursos do APK](android/README.md).
+A edição Android instala diretamente pelo arquivo **[DoceAtelie-Android-1.1.0.apk](android/distribuicao/DoceAtelie-Android-1.1.0.apk)** e funciona sem internet, com banco e fotos no celular. Inclui gestão de clientes, catálogo, orçamentos, pagamentos, agenda, PDFs e backup. O banco é independente do Windows. Consulte [instalação e recursos do APK](android/README.md).
 
 ## Personalizar nome e logo
 

@@ -2,9 +2,13 @@
 
 O aplicativo Android **instala por APK e funciona sozinho no celular**, sem Python, sem hospedagem e sem depender do computador ligado. Requer Android 8.0 ou superior e Android System WebView atualizado. O banco SQLite e as fotos ficam na área privada do aplicativo.
 
+## Alertas de encomendas e e-mail
+
+Lembretes de três e dois dias antes (configuráveis), notificações no Windows e Android com a interface fechada e envio automático ao e-mail da confeitaria. Configure a conta de envio para habilitar e-mails. Os avisos param após a entrega. Veja [como configurar os alertas e o e-mail](../docs/alertas.md).
+
 ## Instalar
 
-1. No Android, baixe [`DoceAtelie-Android-1.0.2.apk`](distribuicao/DoceAtelie-Android-1.0.2.apk).
+1. No Android, baixe [`DoceAtelie-Android-1.1.0.apk`](distribuicao/DoceAtelie-Android-1.1.0.apk).
 2. Abra o arquivo baixado. Se o Android solicitar, permita que o navegador ou gerenciador de arquivos usado instale este aplicativo. Não é necessário desativar o Play Protect.
 3. Toque em **Instalar** e abra **Doce Ateliê** pelo ícone.
 4. Em **Mais → Configurações e backup**, cadastre a identidade e a logo da loja. Confira os preços do catálogo: R$ 75/kg para o Simples e R$ 85/kg para o Especial; os demais preços reais ficam para cadastrar.

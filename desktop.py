@@ -276,8 +276,17 @@ def main():
     parser.add_argument("--porta", type=int)
     parser.add_argument("--stop-file", type=Path)
     parser.add_argument("--diagnostico", type=Path)
+    parser.add_argument("--notificar", action="store_true")
+    parser.add_argument("--dados", type=Path)
+    parser.add_argument("--midia", type=Path)
     args = parser.parse_args()
-    if args.diagnostico:
+    if args.notificar:
+        if not args.dados and not os.environ.get("CONFEITARIA_DATA_DIR"):
+            prepare_data()
+        from confeitaria.storage import Store
+        from confeitaria.notifications import check_reminders
+        check_reminders(Store(args.dados, args.midia))
+    elif args.diagnostico:
         diagnostic(args.diagnostico)
     elif args.serve:
         if args.porta is None or not 1 <= args.porta <= 65535 or args.stop_file is None:

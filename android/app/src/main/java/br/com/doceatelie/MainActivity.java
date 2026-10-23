@@ -85,6 +85,7 @@ public class MainActivity extends Activity {
         settings.setSupportMultipleWindows(false);
         web.addJavascriptInterface(new Bridge(),"Android");
         web.setWebViewClient(new WebViewClient(){
+            @Override public void onPageFinished(WebView view,String url){openReminder();}
             @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request) {
                 Uri uri=request.getUrl();
                 if ("file".equals(uri.getScheme()) && uri.toString().startsWith("file:///android_asset/")) return false;
@@ -107,6 +108,7 @@ public class MainActivity extends Activity {
             }
         });
         web.loadUrl("file:///android_asset/index.html");
+        ReminderJob.schedule(this);
         if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::handleBack);
     }
     private void message(String text){runOnUiThread(()->new AlertDialog.Builder(this).setMessage(text).setPositiveButton("Entendi",null).show());}
@@ -122,8 +124,19 @@ public class MainActivity extends Activity {
     public final class Bridge {
         @JavascriptInterface public String loadState(String mode){try{return store.load(mode);}catch(Exception exc){return "{\"storageError\":true}";}}
         @JavascriptInterface public String saveState(String mode,String raw){
-            try{store.save(mode,raw);return "";}catch(Exception exc){return "Não foi possível salvar. Confira o espaço livre do aparelho e tente novamente.";}
+            try{store.save(mode,raw);if("real".equals(mode))ReminderJob.schedule(MainActivity.this);return "";}catch(Exception exc){return "Não foi possível salvar. Confira o espaço livre do aparelho e tente novamente.";}
         }
+        @JavascriptInterface public String reminderStatus(){return ReminderEngine.status(MainActivity.this);}
+        @JavascriptInterface public String saveMailPassword(String password){try{MailCredentials.save(MainActivity.this,password);return "";}catch(Exception ignored){return "Não foi possível proteger a senha neste aparelho. Tente novamente.";}}
+        @JavascriptInterface public void requestNotifications(){runOnUiThread(()->{
+            if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},31);
+            else{ReminderJob.schedule(MainActivity.this);callback("onNativeNotice",JSONObject.quote(ReminderEngine.permission(MainActivity.this)?"Notificações permitidas.":"Permita os avisos nas configurações do celular."));}
+        });}
+        @JavascriptInterface public void notificationSettings(){runOnUiThread(()->startActivity(new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,getPackageName())));}
+        @JavascriptInterface public void testReminderEmail(){network.execute(()->{
+            try{JSONObject state=store.notificationState();JSONObject settings=state.getJSONObject("settings");SmtpMailer.send(settings,MailCredentials.load(MainActivity.this),settings.optString("name")+" · Teste de notificações","Seu e-mail de notificações está configurado. Os lembretes serão enviados conforme os dias e o horário escolhidos.");callback("onNativeNotice",JSONObject.quote("E-mail de teste enviado. Confira também o spam."));}
+            catch(Exception ignored){callback("onNativeNotice",JSONObject.quote("E-mail não enviado. Salve as configurações e confira a internet, o servidor SMTP e a senha de aplicativo."));}
+        });}
         @JavascriptInterface public void exportBackup(String raw){export(raw.getBytes(StandardCharsets.UTF_8),"application/json","DoceAtelie-backup.json");}
         @JavascriptInterface public void importBackup(){runOnUiThread(()->{
             Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
@@ -198,6 +211,21 @@ public class MainActivity extends Activity {
         }
     }
     private void handleBack(){web.evaluateJavascript("window.appBack ? window.appBack() : false",result->{if(!"true".equals(result)) new AlertDialog.Builder(this).setMessage("Fechar o Doce Ateliê? Os dados salvos permanecerão no celular.").setPositiveButton("Fechar",(d,w)->finish()).setNegativeButton("Continuar",null).show();});}
+    private void openReminder(){
+        String id=getIntent().getStringExtra("quote_id");
+        if(id!=null){getIntent().removeExtra("quote_id");web.evaluateJavascript("window.openReminder && window.openReminder("+JSONObject.quote(id)+")",null);}
+    }
+    @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);openReminder();}
+    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){
+        super.onRequestPermissionsResult(request,permissions,results);
+        if(request==31){
+            if(ReminderEngine.permission(this)){
+                android.content.SharedPreferences prefs=getSharedPreferences("reminder-deliveries",MODE_PRIVATE);android.content.SharedPreferences.Editor edit=prefs.edit();
+                for(String key:prefs.getAll().keySet())if(key.startsWith("retry-"))edit.remove(key);edit.apply();ReminderJob.schedule(this);
+            }
+            callback("onNativeNotice",JSONObject.quote(ReminderEngine.permission(this)?"Notificações ativadas no celular.":"Notificações bloqueadas. Você pode permiti-las nas configurações do celular."));
+        }
+    }
     @Override public void onBackPressed(){handleBack();}
     @Override protected void onDestroy(){network.shutdownNow();web.removeJavascriptInterface("Android");web.destroy();store.close();super.onDestroy();}
 }

@@ -2,3 +2,5 @@
 
 /* Identidade da loja: quadro fixo, imagem proporcional e nomes longos sem transbordar. */
 header .brand-text{flex:1;min-width:0;max-width:900px;overflow-wrap:anywhere}header strong{display:block;line-height:1.25}.brand-icon{width:44px;height:44px;flex-shrink:0;padding:0;display:flex;align-items:center;justify-content:center;overflow:hidden}.brand-icon.has-logo{background:white}.brand-icon img{width:100%;height:100%;object-fit:contain}.local-tag{flex-shrink:0;white-space:nowrap;margin-left:0}
+
+.reminder-days{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px}.reminder-days .check{margin:3px 0;font-size:12px}

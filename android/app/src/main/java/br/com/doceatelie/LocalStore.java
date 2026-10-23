@@ -71,6 +71,18 @@ final class LocalStore extends SQLiteOpenHelper {
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
     }
+    synchronized JSONObject notificationState() throws Exception {
+        SQLiteDatabase db=getReadableDatabase();JSONObject result=null;
+        try(Cursor cursor=db.query("documents",new String[]{"payload"},"namespace='real' AND kind='meta'",null,null,null,null)){
+            if(cursor.moveToFirst())result=new JSONObject(cursor.getString(0));
+        }
+        if(result==null)return null;
+        JSONArray quotes=new JSONArray();
+        try(Cursor cursor=db.query("documents",new String[]{"payload"},"namespace='real' AND kind='quotes'",null,null,null,"identifier")){
+            while(cursor.moveToNext())quotes.put(new JSONObject(cursor.getString(0)));
+        }
+        return result.put("quotes",quotes);
+    }
     private void write(SQLiteDatabase db,String ns,String kind,String identifier,String payload) {
         ContentValues values=new ContentValues();
         values.put("namespace",ns);values.put("kind",kind);values.put("identifier",identifier);values.put("payload",payload);

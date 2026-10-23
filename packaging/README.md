@@ -2,13 +2,17 @@
 
 O empacotamento produz um **instalador Windows x64** e uma versão portátil. Python, Streamlit e todas as dependências acompanham o aplicativo. **O cliente não precisa instalar Python nem executar comandos.** A interface continua abrindo no navegador local; uma pequena janela controla Abrir / Encerrar.
 
+## Alertas de encomendas e e-mail
+
+Lembretes de três e dois dias antes (configuráveis), notificações no Windows e Android com a interface fechada e envio automático ao e-mail da confeitaria. Configure a conta de envio para habilitar e-mails. Os avisos param após a entrega. Veja [como configurar os alertas e o e-mail](../docs/alertas.md).
+
 ## Baixar o instalador
 
-O workflow publica o `.exe` testado em uma [Release pública](https://github.com/molino92-cyber/Bruno/releases), permitindo baixar diretamente, sem ZIP e sem conta GitHub. O link da versão atual é [DoceAtelie-Instalador-1.2.1-Windows-x64.exe](https://github.com/molino92-cyber/Bruno/releases/download/windows-v1.2.1/DoceAtelie-Instalador-1.2.1-Windows-x64.exe). A publicação ocorre somente após os testes do executável Windows e do servidor passarem.
+O workflow publica o `.exe` testado em uma [Release pública](https://github.com/molino92-cyber/Bruno/releases), permitindo baixar diretamente, sem ZIP e sem conta GitHub. O link da versão atual é [DoceAtelie-Instalador-1.3.0-Windows-x64.exe](https://github.com/molino92-cyber/Bruno/releases/download/windows-v1.3.0/DoceAtelie-Instalador-1.3.0-Windows-x64.exe). A publicação ocorre somente após os testes do executável Windows e do servidor passarem.
 
 ## Experiência do cliente
 
-1. Executar `DoceAtelie-Instalador-1.2.1-Windows-x64.exe`.
+1. Executar `DoceAtelie-Instalador-1.3.0-Windows-x64.exe`.
 2. Seguir o instalador em português. A instalação é por usuário, sem exigir administrador.
 3. Abrir **Doce Ateliê** pelo menu Iniciar ou pelo atalho da área de trabalho.
 4. O navegador abre automaticamente quando o sistema está pronto. Manter a pequena janela Doce Ateliê aberta durante o uso.
@@ -39,7 +43,7 @@ Abra PowerShell na raiz do projeto:
 ```powershell
 .\packaging\build-windows.ps1
 # Outra versão de atualização, se necessário:
-.\packaging\build-windows.ps1 -Version 1.2.1
+.\packaging\build-windows.ps1 -Version 1.3.0
 ```
 
 Se a política local bloquear scripts, ela precisa permitir esse script revisado conforme as regras do computador. Não é necessário mudar a política global.
@@ -48,7 +52,7 @@ O script cria `.venv-build`, instala dependências, executa os testes, empacota 
 
 ```text
 dist\DoceAtelie\DoceAtelie.exe
-dist\instalador\DoceAtelie-Instalador-1.2.1-Windows-x64.exe
+dist\instalador\DoceAtelie-Instalador-1.3.0-Windows-x64.exe
 ```
 
 O teste do binário verifica SQLite, mídia, orçamento/sinal, os dois PDFs, backup, resposta HTTP, renderização da interface por WebSocket e encerramento do servidor. Todo teste usa perfil temporário e não altera dados reais.

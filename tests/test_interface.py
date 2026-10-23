@@ -82,6 +82,22 @@ class InterfaceTests(unittest.TestCase):
         self.assertIn('Doces &amp; Afeto', self.app.sidebar.markdown[0].value)
         self.assertEqual(Store().settings()["logo"], "")
 
+    def test_notification_preferences_preserve_brand_and_validate_email(self):
+        self.page("Configurações")
+        self.widget("text_input", "E-mail para receber notificações").set_value('cozinha@example.com')
+        self.widget("multiselect", "Antecedência dos alertas (dias)").set_value([3, 2, 1])
+        self.click("Salvar alertas")
+        settings = self.store.settings()
+        self.assertEqual(settings["notification_email"], 'cozinha@example.com')
+        self.assertEqual(settings["alert_days"], [3, 2, 1])
+        self.widget("text_input", "Nome da confeitaria *").set_value('Doces de Maria')
+        self.click("Salvar configurações")
+        self.assertEqual(self.store.settings()["notification_email"], 'cozinha@example.com')
+        self.widget("text_input", "E-mail para receber notificações").set_value('email-inválido')
+        self.click("Salvar alertas")
+        self.assertEqual(self.store.settings()["notification_email"], 'cozinha@example.com')
+        self.assertTrue(any('e-mail válido' in e.value for e in self.app.error))
+
     def start_quote(self, client=None):
         client = client or self.client()
         self.page("Novo orçamento")

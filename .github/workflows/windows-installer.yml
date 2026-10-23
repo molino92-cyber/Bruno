@@ -106,7 +106,7 @@ jobs:
             const tag = 'windows-v' + version;
             const data = fs.readFileSync('instalador/' + filename);
             const sha = crypto.createHash('sha256').update(data).digest('hex');
-            const body = `Nome e logo da confeitaria editáveis em Configurações, no cabeçalho e nos próximos orçamentos. Logo proporcional e dados preservados ao atualizar.\n\nBaixe o arquivo .exe abaixo e instale sobre a versão existente. Não precisa baixar ZIP nem ter conta GitHub.\n\nSHA-256: \`${sha}\``;
+            const body = `Lembretes de encomendas com antecedência e horário configuráveis, notificações no Windows mesmo com a interface fechada e envio por e-mail via SMTP com TLS. Configure o destinatário e a conta de envio em Configurações → Alertas de encomendas e e-mail. Senha protegida pelo Windows e excluída do backup. Pedidos entregues não geram novos avisos.\n\nBaixe o arquivo .exe abaixo e instale sobre a versão existente. Não precisa baixar ZIP nem ter conta GitHub.\n\nSHA-256: \`${sha}\``;
             let release;
             try {
               release = (await github.rest.repos.getReleaseByTag({...context.repo, tag})).data;
@@ -117,6 +117,6 @@ jobs:
               }
             } catch (error) {
               if (error.status !== 404) throw error;
-              release = (await github.rest.repos.createRelease({...context.repo, tag_name:tag, target_commitish:context.sha, name:'Windows ' + version + ' · Identidade da confeitaria', body, draft:false, prerelease:false})).data;
+              release = (await github.rest.repos.createRelease({...context.repo, tag_name:tag, target_commitish:context.sha, name:'Windows ' + version + ' · Alertas de encomendas e e-mail', body, draft:false, prerelease:false})).data;
             }
             await github.rest.repos.uploadReleaseAsset({...context.repo, release_id:release.id, name:filename, data, headers:{'content-type':'application/octet-stream','content-length':data.length}});

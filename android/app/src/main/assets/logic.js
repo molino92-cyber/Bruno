@@ -58,6 +58,16 @@
   const c={...values};c.name=String(c.name||'').trim();ensure(c.name.length>=2,'Informe o nome completo.');c.phone=String(c.phone||'').replace(/\D/g,'');ensure(/^\d{10,13}$/.test(c.phone),'Informe o telefone com DDD.');c.cpf=cpf(c.cpf);c.email=String(c.email||'').trim().toLowerCase();ensure(!c.email||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email),'Informe um e-mail válido.');c.postal_code=String(c.postal_code||'').replace(/\D/g,'');ensure(!c.postal_code||/^\d{8}$/.test(c.postal_code),'O CEP deve ter oito dígitos.');return c;
  }
  function address(c){return [c.street&&(c.street+(c.number?', '+c.number:'')),c.complement,c.neighborhood,[c.city,c.state].filter(Boolean).join(' / '),c.postal_code?'CEP '+c.postal_code:''].filter(Boolean).join(' · ');}
+ const reminderDefaults={reminders_enabled:false,local_notifications:true,alert_days:[3,2],alert_time:'09:00',notification_email:'',email_enabled:false,smtp_host:'smtp.gmail.com',smtp_port:465,smtp_security:'SSL/TLS',smtp_username:'',smtp_sender:''};
+ function reminderSettings(values){
+  const s={...reminderDefaults,...values};
+  ensure(Array.isArray(s.alert_days)&&s.alert_days.length&&s.alert_days.every(d=>[0,1,2,3,7].includes(d)),'Escolha pelo menos uma antecedência para os alertas.');s.alert_days=[...new Set(s.alert_days)].sort((a,b)=>b-a);
+  ensure(/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(s.alert_time),'Informe um horário válido para os avisos.');
+  const email=v=>typeof v==='string'&&/^[^\s<>@,;\r\n]+@[^\s<>@,;\r\n]+\.[^\s<>@,;\r\n]+$/.test(v);
+  s.notification_email=String(s.notification_email||'').trim();ensure(!s.notification_email||email(s.notification_email),'Informe um e-mail válido para receber notificações.');
+  if(s.email_enabled){ensure(email(s.notification_email)&&email(s.smtp_sender),'Confira os e-mails de notificação e do remetente.');ensure(/^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/.test(s.smtp_host)&&Number.isInteger(s.smtp_port)&&s.smtp_port>0&&s.smtp_port<=65535,'Confira o servidor e a porta SMTP.');ensure(['SSL/TLS','STARTTLS'].includes(s.smtp_security),'Escolha uma conexão segura de e-mail.');ensure(s.smtp_username&&!/[\r\n]/.test(s.smtp_username),'Informe o usuário SMTP.');}
+  return s;
+ }
  function validateBackup(state){
   ensure(state&&state.schema===1&&state.settings&&state.images,'Este arquivo não é um backup do aplicativo Android.');
   for(const key of ['products','customers','inventory','quotes']){ensure(Array.isArray(state[key])&&state[key].every(item=>item&&typeof item.id==='string'&&item.id.length<100),'Backup com cadastros inválidos.');ensure(new Set(state[key].map(x=>x.id)).size===state[key].length,'O backup possui identificadores duplicados.');}
@@ -65,5 +75,5 @@
   for(const q of state.quotes){ensure(Array.isArray(q.lines)&&q.totals&&Number.isSafeInteger(q.totals.total_cents)&&q.totals.total_cents>0&&Array.isArray(q.payments),'Backup com orçamento inválido.');ensure(state.customers.some(c=>c.id===q.customer_id),'Backup com pedido sem cadastro de cliente.');ensure(q.payments.every(p=>Number.isSafeInteger(p.amount_cents)&&p.amount_cents>0)&&paid(q)<=q.totals.total_cents,'Backup com pagamentos inválidos.');}
   return state;
  }
- return {categories,fillings,brigadeiros,extras,units,today,plusDays,money,amount,price,line,totals,paid,status,payment,cpf,customer,address,validateBackup};
+ return {reminderDefaults,reminderSettings,categories,fillings,brigadeiros,extras,units,today,plusDays,money,amount,price,line,totals,paid,status,payment,cpf,customer,address,validateBackup};
 });

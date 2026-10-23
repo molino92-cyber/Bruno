@@ -1,4 +1,4 @@
-const CACHE = 'doce-publico-v1.2.1';
+const CACHE = 'doce-publico-v1.3.0';
 const PUBLIC_FILES = ['/offline.html', '/mobile.css', '/icone-192.png', '/icone-512.png', '/apple-touch-icon.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(PUBLIC_FILES)).then(() => self.skipWaiting()));
